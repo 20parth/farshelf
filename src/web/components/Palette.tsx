@@ -175,7 +175,7 @@ function SearchPane({ onClose }: { onClose: () => void }) {
       <label id={labelId} className="sr-only">
         Search file names across all storage
       </label>
-      <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3">
+      <div className="flex items-center gap-2 rounded-xl border border-line bg-paper px-3 focus-within:ring-2 focus-within:ring-accent">
         <Search className="size-4 text-muted" aria-hidden />
         <input
           autoFocus
