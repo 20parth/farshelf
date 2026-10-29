@@ -18,13 +18,21 @@ async function setup(opts: { passphrase?: string } = {}) {
   open.push(app);
   app.start();
   const root = await tmpDir('farshelf-store-');
-  const { remote, recoveryKey } = await app.createRemote({ kind: 'local', name: 'Store', config: { root }, passphrase: opts.passphrase });
+  const { remote, recoveryKey } = await app.createRemote({
+    kind: 'local',
+    name: 'Store',
+    config: { root },
+    passphrase: opts.passphrase,
+  });
   await waitJobsIdle(app);
   return { app, dir, root, id: remote.id, recoveryKey };
 }
 
 async function upload(app: App, id: string, p: string, data: Buffer, autoRename = false) {
-  const job = await app.receiveUpload(id, p, Readable.from([data]), { expectedSize: data.length, autoRename });
+  const job = await app.receiveUpload(id, p, Readable.from([data]), {
+    expectedSize: data.length,
+    autoRename,
+  });
   await waitFor(() => app.jobs.get(job.id)?.state === 'done');
   return job;
 }
@@ -38,11 +46,16 @@ describe('plain local remote', () => {
     const entries = await app.list(id, '/Films');
     expect(entries).toMatchObject([{ name: 'trip reel.mov', kind: 'file', size: data.length }]);
     const chunks: Uint8Array[] = [];
-    for await (const c of app.vault(id).readRange('/Films/trip reel.mov', SEGMENT_SIZE - 10, SEGMENT_SIZE + 10)) chunks.push(c);
+    for await (const c of app
+      .vault(id)
+      .readRange('/Films/trip reel.mov', SEGMENT_SIZE - 10, SEGMENT_SIZE + 10))
+      chunks.push(c);
     expect(Buffer.concat(chunks).equals(data.subarray(SEGMENT_SIZE - 10, SEGMENT_SIZE + 10))).toBe(true);
     const results = app.search({ text: 'trip', sort: 'relevance', order: 'desc', limit: 10 });
     expect(results.map((r) => r.path)).toEqual(['/Films/trip reel.mov']);
-    expect(app.search({ category: 'video', minSize: 1, sort: 'size', order: 'desc', limit: 10 })).toHaveLength(1);
+    expect(
+      app.search({ category: 'video', minSize: 1, sort: 'size', order: 'desc', limit: 10 }),
+    ).toHaveLength(1);
     expect(app.search({ category: 'audio', sort: 'size', order: 'desc', limit: 10 })).toHaveLength(0);
   });
 
@@ -75,7 +88,11 @@ describe('plain local remote', () => {
     expect(await app.vault(id).stat('/Archive/doc.pdf')).toBeNull();
     expect(app.listTrash()).toHaveLength(1);
     expect((await app.list(id, '/')).map((e) => e.name)).toEqual(['Archive']); // trash dir hidden
+    expect(app.search({ text: 'doc', sort: 'relevance', order: 'desc', limit: 5 })).toHaveLength(0);
     expect(await app.restore(item.id)).toBe('/Archive/doc.pdf');
+    expect(
+      app.search({ text: 'doc', sort: 'relevance', order: 'desc', limit: 5 }).map((r) => r.path),
+    ).toEqual(['/Archive/doc.pdf']);
     expect((await app.vault(id).readAll('/Archive/doc.pdf')).toString()).toBe('%PDF');
     const again = await app.trash(id, '/Archive/doc.pdf');
     await app.purge(again.id);
@@ -98,7 +115,9 @@ describe('plain local remote', () => {
     await expect(app.move(id, '/A', '/A/B')).rejects.toThrow(/into itself/);
     await expect(app.mkdir(id, '/.farshelf/x')).rejects.toThrow(/reserved/);
     await expect(app.trash(id, '/')).rejects.toThrow(/root/);
-    await expect(app.createRemote({ kind: 'local', name: 'store', config: { root: '/tmp/x' } })).rejects.toThrow(/already exists/);
+    await expect(
+      app.createRemote({ kind: 'local', name: 'store', config: { root: '/tmp/x' } }),
+    ).rejects.toThrow(/already exists/);
   });
 
   it('cancelling an upload deletes the spool file', async () => {
@@ -132,9 +151,14 @@ describe('encrypted local remote', () => {
     const stored = await fs.readFile(path.join(root, top[0]!, inner[0]!));
     expect(stored.length).toBeGreaterThan(data.length);
     expect(stored.includes(data.subarray(0, 64))).toBe(false);
-    expect(await app.list(id, '/Secret Folder')).toMatchObject([{ name: 'passport scan.pdf', size: data.length }]);
+    expect(await app.list(id, '/Secret Folder')).toMatchObject([
+      { name: 'passport scan.pdf', size: data.length },
+    ]);
     const chunks: Uint8Array[] = [];
-    for await (const c of app.vault(id).readRange('/Secret Folder/passport scan.pdf', SEGMENT_SIZE - 3, SEGMENT_SIZE + 3)) chunks.push(c);
+    for await (const c of app
+      .vault(id)
+      .readRange('/Secret Folder/passport scan.pdf', SEGMENT_SIZE - 3, SEGMENT_SIZE + 3))
+      chunks.push(c);
     expect(Buffer.concat(chunks).equals(data.subarray(SEGMENT_SIZE - 3, SEGMENT_SIZE + 3))).toBe(true);
   });
 
@@ -153,8 +177,15 @@ describe('encrypted local remote', () => {
     await upload(app, id, '/a/b.txt', Buffer.from('portable'));
     const other = await makeApp();
     open.push(other.app);
-    await expect(other.app.createRemote({ kind: 'local', name: 'Copy', config: { root } })).rejects.toThrow(/passphrase/);
-    const { remote, recoveryKey } = await other.app.createRemote({ kind: 'local', name: 'Copy', config: { root }, passphrase: 'a long passphrase' });
+    await expect(other.app.createRemote({ kind: 'local', name: 'Copy', config: { root } })).rejects.toThrow(
+      /passphrase/,
+    );
+    const { remote, recoveryKey } = await other.app.createRemote({
+      kind: 'local',
+      name: 'Copy',
+      config: { root },
+      passphrase: 'a long passphrase',
+    });
     expect(recoveryKey).toBeNull(); // existing vault reused
     expect((await other.app.vault(remote.id).readAll('/a/b.txt')).toString()).toBe('portable');
     const out = await tmpDir('farshelf-out-');
@@ -180,7 +211,12 @@ describe('restart recovery', () => {
     const secrets = new MemorySecrets();
     const root = await tmpDir('farshelf-store-');
     const first = await makeApp({ dataDir: dir, secrets });
-    const { remote } = await first.app.createRemote({ kind: 'local', name: 'S', config: { root }, passphrase: 'a long passphrase' });
+    const { remote } = await first.app.createRemote({
+      kind: 'local',
+      name: 'S',
+      config: { root },
+      passphrase: 'a long passphrase',
+    });
     const data = randomData(20 * 1024 * 1024 + 3);
     const job = await first.app.receiveUpload(remote.id, '/big.bin', Readable.from([data]), {});
     // Simulate a crash after the first chunk: run one chunk by hand and mark the job as running.
@@ -190,7 +226,9 @@ describe('restart recovery', () => {
     const state = await vault.backend.beginUpload(vault.remotePath('/big.bin'), stored);
     const read = vault.uploadReader(payload.spoolPath, data.length, Buffer.from(payload.header, 'base64'));
     await vault.backend.uploadChunk(state, 0, await read(0, vault.backend.chunkSize));
-    first.app.db.prepare(`update jobs set state = 'running', payload = ? where id = ?`).run(JSON.stringify({ ...payload, state }), job.id);
+    first.app.db
+      .prepare(`update jobs set state = 'running', payload = ? where id = ?`)
+      .run(JSON.stringify({ ...payload, state }), job.id);
     first.app.db.close(); // "crash" without a clean shutdown
 
     const second = await makeApp({ dataDir: dir, secrets });

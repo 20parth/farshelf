@@ -5,12 +5,91 @@ import { tx, type Db } from './db.ts';
 import { normPath } from './paths.ts';
 
 export const CATEGORY_EXTENSIONS: Record<string, string[]> = {
-  video: ['mp4', 'mov', 'm4v', 'mkv', 'avi', 'webm', 'mxf', 'braw', 'r3d', 'mts', 'm2ts', 'wmv', 'flv', 'mpg', 'mpeg'],
+  video: [
+    'mp4',
+    'mov',
+    'm4v',
+    'mkv',
+    'avi',
+    'webm',
+    'mxf',
+    'braw',
+    'r3d',
+    'mts',
+    'm2ts',
+    'wmv',
+    'flv',
+    'mpg',
+    'mpeg',
+  ],
   audio: ['mp3', 'wav', 'aiff', 'aif', 'flac', 'm4a', 'aac', 'ogg', 'opus', 'alac', 'wma'],
-  image: ['jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', 'webp', 'tiff', 'tif', 'bmp', 'svg', 'raw', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'raf', 'orf', 'psd'],
-  document: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'txt', 'md', 'rtf', 'pages', 'numbers', 'key', 'csv', 'epub'],
+  image: [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'heic',
+    'heif',
+    'webp',
+    'tiff',
+    'tif',
+    'bmp',
+    'svg',
+    'raw',
+    'cr2',
+    'cr3',
+    'nef',
+    'arw',
+    'dng',
+    'raf',
+    'orf',
+    'psd',
+  ],
+  document: [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'odt',
+    'ods',
+    'odp',
+    'txt',
+    'md',
+    'rtf',
+    'pages',
+    'numbers',
+    'key',
+    'csv',
+    'epub',
+  ],
   archive: ['zip', 'tar', 'gz', 'tgz', 'bz2', 'xz', '7z', 'rar', 'dmg', 'iso', 'sparsebundle'],
-  code: ['js', 'ts', 'tsx', 'jsx', 'py', 'rs', 'go', 'java', 'c', 'cpp', 'h', 'rb', 'php', 'swift', 'kt', 'sh', 'json', 'yaml', 'yml', 'toml', 'html', 'css'],
+  code: [
+    'js',
+    'ts',
+    'tsx',
+    'jsx',
+    'py',
+    'rs',
+    'go',
+    'java',
+    'c',
+    'cpp',
+    'h',
+    'rb',
+    'php',
+    'swift',
+    'kt',
+    'sh',
+    'json',
+    'yaml',
+    'yml',
+    'toml',
+    'html',
+    'css',
+  ],
 };
 
 export class Catalog {
@@ -54,7 +133,9 @@ export class Catalog {
 
   removeTree(remoteId: string, path: string): void {
     const p = normPath(path);
-    this.db.prepare('delete from entries where remote_id = ? and (path = ? or path like ? escape \'\\\')').run(remoteId, p, likePrefix(p));
+    this.db
+      .prepare("delete from entries where remote_id = ? and (path = ? or path like ? escape '\\')")
+      .run(remoteId, p, likePrefix(p));
   }
 
   /** Re-key a moved subtree. */
@@ -63,21 +144,36 @@ export class Catalog {
     const b = normPath(to);
     tx(this.db, () => {
       const rows = this.db
-        .prepare(`select path, kind, size, mtime from entries where remote_id = ? and (path = ? or path like ? escape '\\')`)
-        .all(remoteId, a, likePrefix(a)) as { path: string; kind: 'file' | 'dir'; size: number; mtime: number }[];
+        .prepare(
+          `select path, kind, size, mtime from entries where remote_id = ? and (path = ? or path like ? escape '\\')`,
+        )
+        .all(remoteId, a, likePrefix(a)) as {
+        path: string;
+        kind: 'file' | 'dir';
+        size: number;
+        mtime: number;
+      }[];
       this.removeTree(remoteId, b);
       this.removeTree(remoteId, a);
       for (const r of rows) {
         const np = b + r.path.slice(a.length);
-        this.upsert(remoteId, { path: np, name: np.slice(np.lastIndexOf('/') + 1), kind: r.kind, size: r.size, mtime: r.mtime });
+        this.upsert(remoteId, {
+          path: np,
+          name: np.slice(np.lastIndexOf('/') + 1),
+          kind: r.kind,
+          size: r.size,
+          mtime: r.mtime,
+        });
       }
     });
   }
 
   count(remoteId?: string): number {
-    const row = (remoteId
-      ? this.db.prepare('select count(*) as n from entries where remote_id = ?').get(remoteId)
-      : this.db.prepare('select count(*) as n from entries').get()) as { n: number };
+    const row = (
+      remoteId
+        ? this.db.prepare('select count(*) as n from entries where remote_id = ?').get(remoteId)
+        : this.db.prepare('select count(*) as n from entries').get()
+    ) as { n: number };
     return row.n;
   }
 
@@ -99,9 +195,10 @@ export class Catalog {
       where.push('e.kind = ?');
       args.push(f.kind);
     }
-    const exts = [...(f.extensions ?? []), ...(f.category ? CATEGORY_EXTENSIONS[f.category] ?? [] : [])].map((x) =>
-      x.toLowerCase().replace(/^\./, ''),
-    );
+    const exts = [
+      ...(f.extensions ?? []),
+      ...(f.category ? (CATEGORY_EXTENSIONS[f.category] ?? []) : []),
+    ].map((x) => x.toLowerCase().replace(/^\./, ''));
     if (exts.length) {
       where.push(`(${exts.map(() => 'lower(e.name) like ?').join(' or ')})`);
       args.push(...exts.map((x) => `%.${x}`));

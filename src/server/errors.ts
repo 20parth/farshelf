@@ -23,7 +23,11 @@ export class ConflictError extends AppError {
 
 export class LockedError extends AppError {
   constructor(remoteName: string) {
-    super(423, 'locked', `"${remoteName}" is encrypted and locked. Unlock it with your passphrase or recovery key.`);
+    super(
+      423,
+      'locked',
+      `"${remoteName}" is encrypted and locked. Unlock it with your passphrase or recovery key.`,
+    );
   }
 }
 
@@ -37,10 +41,13 @@ export class TransientError extends AppError {
 export function isTransient(err: unknown): boolean {
   if (err instanceof TransientError) return true;
   if (err instanceof AppError) return false;
-  const code = (err as { code?: string; cause?: { code?: string } })?.cause?.code ?? (err as { code?: string })?.code;
+  const code =
+    (err as { code?: string; cause?: { code?: string } })?.cause?.code ?? (err as { code?: string })?.code;
   return (
     err instanceof TypeError /* fetch failed */ ||
-    ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE', 'UND_ERR_SOCKET'].includes(code ?? '')
+    ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EPIPE', 'UND_ERR_SOCKET'].includes(
+      code ?? '',
+    )
   );
 }
 

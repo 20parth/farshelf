@@ -68,7 +68,9 @@ on('GET', '/api/remotes/:id/list', async ({ app, url, params }) => {
   const entries = await app.list(params[0]!, pathParam(url));
   return { entries };
 });
-on('GET', '/api/remotes/:id/link', async ({ app, url, params }) => ({ url: app.streamUrl(params[0]!, pathParam(url)) }));
+on('GET', '/api/remotes/:id/link', async ({ app, url, params }) => ({
+  url: app.streamUrl(params[0]!, pathParam(url)),
+}));
 on('POST', '/api/remotes/:id/mkdir', async ({ app, req, params }) => {
   const { path, source } = await readJson(req, pathInput);
   await app.mkdir(params[0]!, path, source);
@@ -114,7 +116,9 @@ on('POST', '/api/jobs/:id/:action', async ({ app, params }) => {
 });
 
 // ---- search & activity ----
-on('POST', '/api/search', async ({ app, req }) => ({ results: app.search(await readJson(req, searchFilter)) }));
+on('POST', '/api/search', async ({ app, req }) => ({
+  results: app.search(await readJson(req, searchFilter)),
+}));
 on('GET', '/api/activity', async ({ app, url }) => ({ items: app.activity.list(query(url, 'q')) }));
 
 // ---- settings & maintenance ----
@@ -125,7 +129,12 @@ on('POST', '/api/cache/clear', async ({ app }) => {
   return app.cache.stats();
 });
 on('POST', '/api/mount', async ({ app }) => {
-  if (process.platform !== 'darwin') throw new AppError(400, 'unsupported', 'automatic mounting is only available on macOS; see the instructions in Settings');
+  if (process.platform !== 'darwin')
+    throw new AppError(
+      400,
+      'unsupported',
+      'automatic mounting is only available on macOS; see the instructions in Settings',
+    );
   const url = `${app.baseUrl}${DAV_PREFIX}/`;
   // Script goes to osascript on stdin so the password is not visible in the process list.
   const script = `mount volume "${url}" as user name "farshelf" with password "${app.auth.davPassword}"`;
@@ -135,16 +144,29 @@ on('POST', '/api/mount', async ({ app }) => {
     child.on('close', (c) => resolve(c ?? -1));
     child.stdin.end(script);
   });
-  if (code !== 0) throw new AppError(502, 'mount_failed', 'macOS could not mount the drive. Try Finder › Go › Connect to Server with the address shown.');
+  if (code !== 0)
+    throw new AppError(
+      502,
+      'mount_failed',
+      'macOS could not mount the drive. Try Finder › Go › Connect to Server with the address shown.',
+    );
   app.activity.add('info', 'mount', `Mounted ${url} in Finder`);
   return { ok: true };
 });
 
 // ---- Google sign-in ----
 on('POST', '/api/oauth/google/start', async ({ app, req }) => {
-  const body = await readJson(req, z.object({ clientId: z.string().min(10).optional(), clientSecret: z.string().optional() }));
+  const body = await readJson(
+    req,
+    z.object({ clientId: z.string().min(10).optional(), clientSecret: z.string().optional() }),
+  );
   const clientId = body.clientId ?? process.env.FARSHELF_GDRIVE_CLIENT_ID;
-  if (!clientId) throw new AppError(400, 'no_client_id', 'enter your Google OAuth client ID (see docs/AI_AND_PROVIDERS.md)');
+  if (!clientId)
+    throw new AppError(
+      400,
+      'no_client_id',
+      'enter your Google OAuth client ID (see docs/AI_AND_PROVIDERS.md)',
+    );
   return app.startGoogleSignIn(clientId, body.clientSecret || process.env.FARSHELF_GDRIVE_CLIENT_SECRET);
 });
 on('GET', '/api/oauth/google/:flow', async ({ app, params }) => app.googleFlowStatus(params[0]!));
@@ -152,7 +174,8 @@ on('GET', '/api/oauth/google/:flow', async ({ app, params }) => app.googleFlowSt
 // ---- AI (optional) ----
 async function provider(app: App) {
   const s = app.settings.ai;
-  if (!s.enabled) throw new AppError(400, 'ai_disabled', 'AI features are turned off. Enable them in Settings › AI.');
+  if (!s.enabled)
+    throw new AppError(400, 'ai_disabled', 'AI features are turned off. Enable them in Settings › AI.');
   return makeProvider(s, await app.aiApiKey());
 }
 on('POST', '/api/ai/test', async ({ app }) => {
@@ -184,7 +207,9 @@ on('POST', '/api/ai/plan', async ({ app, req }) => {
       }))
     : null;
   const plan = await aiPlanSteps(await provider(app), input.request, { cwd: input.cwd, entries });
-  app.activity.add('info', 'ai', `AI proposed ${plan.steps.length} step(s) for: "${input.request}"`, { remoteId: input.remoteId });
+  app.activity.add('info', 'ai', `AI proposed ${plan.steps.length} step(s) for: "${input.request}"`, {
+    remoteId: input.remoteId,
+  });
   return { plan, sharedNames: share, encryptedWithheld: input.shareNames && vault.encrypted };
 });
 

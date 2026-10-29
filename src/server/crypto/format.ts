@@ -71,7 +71,8 @@ export function openHeader(masterKey: Buffer, header: Uint8Array): FileCrypto {
 
 /** STREAM nonce: prefix(7) || index(4, big-endian) || last(1). */
 export function segmentNonce(prefix: Buffer, index: number, last: boolean): Buffer {
-  if (!Number.isInteger(index) || index < 0 || index > 0xffffffff) throw new RangeError('segment index out of range');
+  if (!Number.isInteger(index) || index < 0 || index > 0xffffffff)
+    throw new RangeError('segment index out of range');
   const n = Buffer.alloc(12);
   prefix.copy(n, 0);
   n.writeUInt32BE(index, PREFIX_SIZE);

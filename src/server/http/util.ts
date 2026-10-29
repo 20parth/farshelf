@@ -8,7 +8,11 @@ export type Res = ServerResponse;
 
 export function sendJson(res: Res, status: number, body: unknown): void {
   const data = Buffer.from(JSON.stringify(body));
-  res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'content-length': data.length, 'cache-control': 'no-store' });
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'content-length': data.length,
+    'cache-control': 'no-store',
+  });
   res.end(data);
 }
 
@@ -70,12 +74,37 @@ export function basicAuth(header: string | undefined): { user: string; pass: str
 }
 
 const MIME: Record<string, string> = {
-  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska', avi: 'video/x-msvideo',
-  mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg', opus: 'audio/ogg', aac: 'audio/aac',
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', heic: 'image/heic',
-  pdf: 'application/pdf', txt: 'text/plain; charset=utf-8', md: 'text/plain; charset=utf-8', json: 'application/json',
-  csv: 'text/csv; charset=utf-8', html: 'text/plain; charset=utf-8', zip: 'application/zip',
-  js: 'text/javascript', css: 'text/css', ico: 'image/x-icon', woff2: 'font/woff2',
+  mp4: 'video/mp4',
+  m4v: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+  mkv: 'video/x-matroska',
+  avi: 'video/x-msvideo',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+  ogg: 'audio/ogg',
+  opus: 'audio/ogg',
+  aac: 'audio/aac',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+  txt: 'text/plain; charset=utf-8',
+  md: 'text/plain; charset=utf-8',
+  json: 'application/json',
+  csv: 'text/csv; charset=utf-8',
+  html: 'text/plain; charset=utf-8',
+  zip: 'application/zip',
+  js: 'text/javascript',
+  css: 'text/css',
+  ico: 'image/x-icon',
+  woff2: 'font/woff2',
 };
 
 export function mimeType(name: string): string {
@@ -84,7 +113,10 @@ export function mimeType(name: string): string {
 }
 
 /** Parse a single-range `Range` header. Returns null for "whole file", 'invalid' for unsatisfiable. */
-export function parseRange(header: string | undefined, size: number): { start: number; end: number } | null | 'invalid' {
+export function parseRange(
+  header: string | undefined,
+  size: number,
+): { start: number; end: number } | null | 'invalid' {
   if (!header) return null;
   const m = header.match(/^bytes=(\d*)-(\d*)$/);
   if (!m) return null; // multi-range or unknown unit: serve the whole file
@@ -108,7 +140,11 @@ export async function pipeChunks(chunks: AsyncGenerator<Uint8Array>, res: Res): 
   try {
     for await (const chunk of chunks) {
       if (closed) break;
-      if (!res.write(chunk)) await new Promise<void>((r) => { res.once('drain', r); res.once('close', r); });
+      if (!res.write(chunk))
+        await new Promise<void>((r) => {
+          res.once('drain', r);
+          res.once('close', r);
+        });
     }
   } finally {
     await chunks.return(undefined);

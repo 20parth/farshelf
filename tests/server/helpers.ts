@@ -26,7 +26,9 @@ export async function makeApp(over: Partial<AppOptions> = {}): Promise<{ app: Ap
   return { app, dir };
 }
 
-export async function serve(app: App): Promise<{ server: http.Server; base: string; close: () => Promise<void> }> {
+export async function serve(
+  app: App,
+): Promise<{ server: http.Server; base: string; close: () => Promise<void> }> {
   const server = createServer(app, { webRoot: null });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const port = (server.address() as AddressInfo).port;

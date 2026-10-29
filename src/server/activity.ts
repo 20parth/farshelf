@@ -9,12 +9,25 @@ export class ActivityLog extends EventEmitter {
     this.db = db;
   }
 
-  add(level: ActivityItem['level'], action: string, message: string, opts: { remoteId?: string | null; path?: string | null } = {}) {
+  add(
+    level: ActivityItem['level'],
+    action: string,
+    message: string,
+    opts: { remoteId?: string | null; path?: string | null } = {},
+  ) {
     const ts = Date.now();
     const r = this.db
       .prepare('insert into activity (ts, level, remote_id, action, path, message) values (?, ?, ?, ?, ?, ?)')
       .run(ts, level, opts.remoteId ?? null, action, opts.path ?? null, message);
-    const item: ActivityItem = { id: Number(r.lastInsertRowid), ts, level, remoteId: opts.remoteId ?? null, action, path: opts.path ?? null, message };
+    const item: ActivityItem = {
+      id: Number(r.lastInsertRowid),
+      ts,
+      level,
+      remoteId: opts.remoteId ?? null,
+      action,
+      path: opts.path ?? null,
+      message,
+    };
     this.emit('activity', item);
     return item;
   }
@@ -24,10 +37,14 @@ export class ActivityLog extends EventEmitter {
     const q = query?.trim();
     if (q) {
       return this.db
-        .prepare(`select ${cols} from activity_fts f join activity a on a.id = f.rowid where activity_fts match ? order by a.id desc limit ?`)
+        .prepare(
+          `select ${cols} from activity_fts f join activity a on a.id = f.rowid where activity_fts match ? order by a.id desc limit ?`,
+        )
         .all(ftsQuery(q), limit) as unknown as ActivityItem[];
     }
-    return this.db.prepare(`select ${cols} from activity a order by a.id desc limit ?`).all(limit) as unknown as ActivityItem[];
+    return this.db
+      .prepare(`select ${cols} from activity a order by a.id desc limit ?`)
+      .all(limit) as unknown as ActivityItem[];
   }
 }
 

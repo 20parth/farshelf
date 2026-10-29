@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+/* Farshelf visual system: warm paper, deep teal ink, amber highlights. */
+@theme {
+  --color-paper: #f6f1e6;
+  --color-panel: #fffdf8;
+  --color-sunk: #ede6d6;
+  --color-ink: #1d2a26;
+  --color-muted: #4d5954;
+  --color-line: #ddd3bf;
+  --color-accent: #1f5c55;
+  --color-accent-soft: #d6e7e2;
+  --color-on-accent: #ffffff;
+  --color-amber: #b9771e;
+  --color-amber-soft: #f7e6c4;
+  --color-danger: #b03a2e;
+  --color-danger-soft: #f6dcd8;
+  --color-ok: #2e7d4f;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-paper: #141b19;
+    --color-panel: #1b2421;
+    --color-sunk: #222d2a;
+    --color-ink: #e9e4d8;
+    --color-muted: #9aa8a2;
+    --color-line: #2f3c38;
+    --color-accent: #6fc2b4;
+    --color-accent-soft: #1f3a35;
+    --color-on-accent: #0c1513;
+    --color-amber: #e5ac55;
+    --color-amber-soft: #3a2e1a;
+    --color-danger: #f08b7f;
+    --color-danger-soft: #3d201c;
+    --color-ok: #7fcf9d;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+dialog::backdrop {
+  background: rgb(10 20 18 / 0.45);
+}
+dialog {
+  color: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

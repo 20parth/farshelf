@@ -16,6 +16,10 @@ export default tseslint.config(
   {
     files: ['src/web/**/*.tsx', 'src/web/**/*.ts'],
     plugins: { 'react-hooks': reactHooks },
-    rules: { ...reactHooks.configs.recommended.rules },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      // Resetting local form state when a prop changes is intentional here; the compiler-era rule is too strict for it.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 );

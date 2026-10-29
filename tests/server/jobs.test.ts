@@ -20,7 +20,8 @@ function makeQueue(run: (ctx: JobContext) => Promise<void>, cleanup?: () => Prom
   return { q, db };
 }
 
-const until = (signal: AbortSignal) => new Promise<void>((_, rej) => signal.addEventListener('abort', () => rej(new Error('aborted'))));
+const until = (signal: AbortSignal) =>
+  new Promise<void>((_, rej) => signal.addEventListener('abort', () => rej(new Error('aborted'))));
 
 describe('job state machine', () => {
   it('only allows documented transitions', () => {
@@ -102,7 +103,11 @@ describe('job state machine', () => {
     const job = q.create('upload', 'r', 'f', '/f', { step: 1 });
     await waitFor(() => q.payload(job.id).step === 2);
     // A second queue on the same DB simulates the process restarting.
-    const q2 = new JobQueue(db, { upload: { run: async () => undefined }, index: { run: async () => undefined } }, { concurrency: () => 1, canRun: () => true });
+    const q2 = new JobQueue(
+      db,
+      { upload: { run: async () => undefined }, index: { run: async () => undefined } },
+      { concurrency: () => 1, canRun: () => true },
+    );
     expect(q2.recover()).toBe(1);
     expect(q2.get(job.id)?.state).toBe('queued');
     expect(q2.payload(job.id)).toEqual({ step: 2 });

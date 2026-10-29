@@ -105,7 +105,12 @@ export const settingsPatch = settingsSchema
 // The only operations an AI plan may propose. Executed by the UI calling the normal API after approval.
 export const planStep = z.discriminatedUnion('tool', [
   z.object({ tool: z.literal('mkdir'), path: remotePath, reason: z.string().max(500).optional() }),
-  z.object({ tool: z.literal('move'), from: remotePath, to: remotePath, reason: z.string().max(500).optional() }),
+  z.object({
+    tool: z.literal('move'),
+    from: remotePath,
+    to: remotePath,
+    reason: z.string().max(500).optional(),
+  }),
   z.object({ tool: z.literal('trash'), path: remotePath, reason: z.string().max(500).optional() }),
 ]);
 export type PlanStep = z.infer<typeof planStep>;

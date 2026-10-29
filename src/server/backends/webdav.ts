@@ -40,7 +40,12 @@ export class WebdavBackend implements Backend {
     return new URL(segs.join('/') + (dir && segs.length ? '/' : ''), this.base);
   }
 
-  private async req(method: string, url: URL, init: { headers?: Record<string, string>; body?: string } = {}, signal?: AbortSignal) {
+  private async req(
+    method: string,
+    url: URL,
+    init: { headers?: Record<string, string>; body?: string } = {},
+    signal?: AbortSignal,
+  ) {
     let res: Response;
     try {
       res = await fetch(url, {
@@ -71,14 +76,20 @@ export class WebdavBackend implements Backend {
       body,
     });
     if (res.status === 404) return null;
-    if (res.status !== 207) throw new AppError(502, 'remote_error', `PROPFIND ${p} failed with ${res.status}`);
+    if (res.status !== 207)
+      throw new AppError(502, 'remote_error', `PROPFIND ${p} failed with ${res.status}`);
     const doc = parser.parse(await res.text());
     const out: { href: string; stat: RemoteStat }[] = [];
     for (const r of asArray(doc?.multistatus?.response)) {
       const href = decodeURIComponent(new URL(String(r.href), this.base).pathname);
-      const ok = asArray(r.propstat).find((ps: { status?: string }) => String(ps.status ?? '').includes(' 200'));
+      const ok = asArray(r.propstat).find((ps: { status?: string }) =>
+        String(ps.status ?? '').includes(' 200'),
+      );
       const prop = ok?.prop ?? {};
-      const isDir = prop.resourcetype !== undefined && typeof prop.resourcetype === 'object' && 'collection' in prop.resourcetype;
+      const isDir =
+        prop.resourcetype !== undefined &&
+        typeof prop.resourcetype === 'object' &&
+        'collection' in prop.resourcetype;
       const name = href.replace(/\/$/, '').split('/').pop() ?? '';
       out.push({
         href,
@@ -97,9 +108,7 @@ export class WebdavBackend implements Backend {
     const items = await this.propfind(p, '1');
     if (!items) throw new NotFoundError(p);
     const self = decodeURIComponent(this.url(p, true).pathname).replace(/\/$/, '');
-    return items
-      .filter((i) => i.href.replace(/\/$/, '') !== self)
-      .map((i) => i.stat);
+    return items.filter((i) => i.href.replace(/\/$/, '') !== self).map((i) => i.stat);
   }
 
   async stat(p: string): Promise<RemoteStat | null> {
@@ -109,7 +118,12 @@ export class WebdavBackend implements Backend {
 
   async read(p: string, start: number, end: number, signal?: AbortSignal): Promise<Uint8Array> {
     if (end <= start) return new Uint8Array();
-    const res = await this.req('GET', this.url(p), { headers: { range: `bytes=${start}-${end - 1}` } }, signal);
+    const res = await this.req(
+      'GET',
+      this.url(p),
+      { headers: { range: `bytes=${start}-${end - 1}` } },
+      signal,
+    );
     if (res.status === 404) throw new NotFoundError(p);
     if (res.status === 206) return new Uint8Array(await res.arrayBuffer());
     if (res.status === 200) {
@@ -153,7 +167,8 @@ export class WebdavBackend implements Backend {
   async remove(p: string): Promise<void> {
     if (normPath(p) === '/') throw new Error('refusing to remove the backend root');
     const res = await this.req('DELETE', this.url(p));
-    if (res.status >= 300 && res.status !== 404) throw new AppError(502, 'remote_error', `DELETE failed with ${res.status}`);
+    if (res.status >= 300 && res.status !== 404)
+      throw new AppError(502, 'remote_error', `DELETE failed with ${res.status}`);
   }
 
   async beginUpload(p: string, size: number): Promise<UploadState> {
@@ -172,7 +187,12 @@ export class WebdavBackend implements Backend {
 
   async abortUpload(): Promise<void> {}
 
-  async putStream(p: string, size: number, body: AsyncIterable<Uint8Array>, signal?: AbortSignal): Promise<void> {
+  async putStream(
+    p: string,
+    size: number,
+    body: AsyncIterable<Uint8Array>,
+    signal?: AbortSignal,
+  ): Promise<void> {
     const parent = normPath(p).split('/').slice(0, -1).join('/') || '/';
     if (parent !== '/') await this.mkdir(parent);
     const url = this.url(p);
@@ -197,7 +217,9 @@ export class WebdavBackend implements Backend {
           else reject(new AppError(502, 'remote_error', `WebDAV PUT failed with ${s}`));
         },
       );
-      req.on('error', (err) => reject(signal?.aborted ? err : new TransientError('WebDAV upload interrupted', { cause: err })));
+      req.on('error', (err) =>
+        reject(signal?.aborted ? err : new TransientError('WebDAV upload interrupted', { cause: err })),
+      );
       (async () => {
         for await (const chunk of body) {
           if (!req.write(chunk)) await new Promise((r) => req.once('drain', r));

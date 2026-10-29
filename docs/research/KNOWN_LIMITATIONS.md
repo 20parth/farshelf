@@ -12,6 +12,7 @@
 ## Farshelf limitations (v0.1)
 
 ### File-manager integration
+
 - **OS WebDAV clients may download whole files.** macOS Finder (`webdavfs`)
   and Linux `davfs2` cache a file locally when it is opened. Range reads
   then happen between that client and Farshelf, but the client may still
@@ -25,6 +26,7 @@
   read-write). Farshelf does not enforce locks.
 
 ### Backends
+
 - **Google Drive** is implemented against the public v3 API and tested
   against a local mock. It has **not been tested against live Google
   servers** in this repository's CI. You must create your own OAuth client
@@ -37,6 +39,7 @@
   they briefly use local disk until the background upload finishes.
 
 ### Encryption
+
 - The plaintext size can be worked out from the ciphertext size.
 - Changing the passphrase re-wraps the master key. It doesn't re-encrypt
   files. Rotating the master key isn't supported.
@@ -46,17 +49,20 @@
   `farshelf decrypt` or the documented format.
 
 ### Desktop shell
+
 - No tray icon, global hotkey or autostart yet: these need the planned
   Tauri shell. The ⌘K palette works only inside the UI.
 - No public share links yet.
 
 ### AI
+
 - AI quality depends on the model you choose. Small local models may return
   invalid plans. These are rejected with a clear error rather than run.
 - Paid API providers charge for their own inference. Farshelf has no
   hosted model.
 
 ### Platforms
+
 - Development and tests ran on macOS (Apple silicon). Linux and Windows are
   expected to work because there are no native dependencies, and CI runs
   the test suite on Ubuntu. Windows has not been exercised manually.

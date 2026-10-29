@@ -20,7 +20,14 @@ import {
   type TrashItem,
 } from '../shared/schemas.ts';
 import { ActivityLog } from './activity.ts';
-import { GdriveBackend, GOOGLE, finishOAuth, startOAuth, type GoogleEndpoints, type OAuthFlow } from './backends/gdrive.ts';
+import {
+  GdriveBackend,
+  GOOGLE,
+  finishOAuth,
+  startOAuth,
+  type GoogleEndpoints,
+  type OAuthFlow,
+} from './backends/gdrive.ts';
 import { LocalBackend } from './backends/local.ts';
 import type { Backend } from './backends/types.ts';
 import { WebdavBackend } from './backends/webdav.ts';
@@ -100,7 +107,10 @@ export class App extends EventEmitter {
     this.jobs = new JobQueue(
       db,
       {
-        upload: { run: (job, ctx) => this.runUpload(job, ctx), cleanup: (job, p) => this.cleanupUpload(job, p) },
+        upload: {
+          run: (job, ctx) => this.runUpload(job, ctx),
+          cleanup: (job, p) => this.cleanupUpload(job, p),
+        },
         index: { run: (job, ctx) => this.runIndex(job, ctx) },
       },
       {
@@ -114,7 +124,10 @@ export class App extends EventEmitter {
     );
     this.jobs.on('job', (j: JobInfo) => this.emit('job', j));
     this.jobs.on('job-error', (j: JobInfo, err: unknown) =>
-      this.activity.add('warn', j.kind, `${j.label}: ${errorMessage(err)}`, { remoteId: j.remoteId, path: j.path }),
+      this.activity.add('warn', j.kind, `${j.label}: ${errorMessage(err)}`, {
+        remoteId: j.remoteId,
+        path: j.path,
+      }),
     );
   }
 
@@ -130,11 +143,14 @@ export class App extends EventEmitter {
       try {
         await app.mountRemote(row);
       } catch (err) {
-        app.activity.add('error', 'remote', `Could not open "${row.name}": ${errorMessage(err)}`, { remoteId: row.id });
+        app.activity.add('error', 'remote', `Could not open "${row.name}": ${errorMessage(err)}`, {
+          remoteId: row.id,
+        });
       }
     }
     const recovered = app.jobs.recover();
-    if (recovered) app.activity.add('info', 'recovery', `Resumed ${recovered} interrupted job(s) after restart`);
+    if (recovered)
+      app.activity.add('info', 'recovery', `Resumed ${recovered} interrupted job(s) after restart`);
     return app;
   }
 
@@ -161,7 +177,10 @@ export class App extends EventEmitter {
   }
 
   streamSignature(remoteId: string, p: string): string {
-    return createHmac('sha256', this.auth.streamKey).update(`${remoteId}\n${normPath(p)}`).digest('base64url').slice(0, 32);
+    return createHmac('sha256', this.auth.streamKey)
+      .update(`${remoteId}\n${normPath(p)}`)
+      .digest('base64url')
+      .slice(0, 32);
   }
 
   checkStreamSignature(remoteId: string, p: string, sig: string | null): boolean {
@@ -176,7 +195,8 @@ export class App extends EventEmitter {
   // ---------- settings ----------
 
   private loadSettings(): Settings {
-    const row = this.db.prepare(`select value from settings where key = 'settings'`).get() as { value: string } | undefined;
+    const row = this.db.prepare(`select value from settings where key = 'settings'`).get() as
+      { value: string } | undefined;
     const parsed = settingsSchema.safeParse(row ? JSON.parse(row.value) : {});
     return parsed.success ? parsed.data : settingsSchema.parse({});
   }
@@ -188,9 +208,15 @@ export class App extends EventEmitter {
   async updateSettings(input: unknown): Promise<Settings> {
     const patch = settingsPatch.parse(input);
     const { aiApiKey, ai, ...rest } = patch;
-    const next = settingsSchema.parse({ ...this.settingsValue, ...rest, ai: { ...this.settingsValue.ai, ...ai } });
+    const next = settingsSchema.parse({
+      ...this.settingsValue,
+      ...rest,
+      ai: { ...this.settingsValue.ai, ...ai },
+    });
     this.db
-      .prepare(`insert into settings (key, value) values ('settings', ?) on conflict(key) do update set value = excluded.value`)
+      .prepare(
+        `insert into settings (key, value) values ('settings', ?) on conflict(key) do update set value = excluded.value`,
+      )
       .run(JSON.stringify(next));
     if (aiApiKey !== undefined) {
       if (aiApiKey) await this.secrets.set('ai:apiKey', aiApiKey);
@@ -243,7 +269,11 @@ export class App extends EventEmitter {
     });
   }
 
-  private async makeBackend(row: { id: string; kind: RemoteKind; config: Record<string, unknown> }): Promise<Backend> {
+  private async makeBackend(row: {
+    id: string;
+    kind: RemoteKind;
+    config: Record<string, unknown>;
+  }): Promise<Backend> {
     const c = row.config;
     if (row.kind === 'local') {
       const b = new LocalBackend(String(c.root));
@@ -255,14 +285,21 @@ export class App extends EventEmitter {
       return new WebdavBackend({ url: String(c.url), username: c.username as string | undefined, password });
     }
     const refreshToken = await this.secrets.get(`remote:${row.id}:refresh`);
-    if (!refreshToken) throw new AppError(401, 'remote_auth', 'Google sign-in is missing; remove and re-add this remote');
+    if (!refreshToken)
+      throw new AppError(401, 'remote_auth', 'Google sign-in is missing; remove and re-add this remote');
     const clientSecret = (await this.secrets.get(`remote:${row.id}:clientSecret`)) ?? undefined;
-    return new GdriveBackend({ clientId: String(c.clientId), clientSecret, refreshToken }, String(c.folderName), this.google);
+    return new GdriveBackend(
+      { clientId: String(c.clientId), clientSecret, refreshToken },
+      String(c.folderName),
+      this.google,
+    );
   }
 
   private pendingFor(remoteId: string): Map<string, PendingFile> {
     const rows = this.db
-      .prepare(`select path, payload from jobs where kind = 'upload' and remote_id = ? and state in ('queued', 'running', 'paused', 'failed')`)
+      .prepare(
+        `select path, payload from jobs where kind = 'upload' and remote_id = ? and state in ('queued', 'running', 'paused', 'failed')`,
+      )
       .all(remoteId) as { path: string; payload: string }[];
     const out = new Map<string, PendingFile>();
     for (const r of rows) {
@@ -292,16 +329,27 @@ export class App extends EventEmitter {
   }
 
   startGoogleSignIn(clientId: string, clientSecret?: string): { flowId: string; authUrl: string } {
-    const { flow, authUrl } = startOAuth(clientId, clientSecret, `${this.baseUrl}/oauth/callback`, this.google);
+    const { flow, authUrl } = startOAuth(
+      clientId,
+      clientSecret,
+      `${this.baseUrl}/oauth/callback`,
+      this.google,
+    );
     this.oauthFlows.set(flow.id, flow);
-    for (const [id, f] of this.oauthFlows) if (Date.now() - f.createdAt > 15 * 60_000) this.oauthFlows.delete(id);
+    for (const [id, f] of this.oauthFlows)
+      if (Date.now() - f.createdAt > 15 * 60_000) this.oauthFlows.delete(id);
     return { flowId: flow.id, authUrl };
   }
 
   /** Handles the browser redirect from Google. Authenticated by the unguessable `state`. */
   async completeGoogleSignIn(state: string, code: string | null, error: string | null): Promise<OAuthFlow> {
     const flow = [...this.oauthFlows.values()].find((f) => safeEqual(f.state, state));
-    if (!flow) throw new AppError(400, 'oauth_state', 'This sign-in link is unknown or expired. Start again from Farshelf.');
+    if (!flow)
+      throw new AppError(
+        400,
+        'oauth_state',
+        'This sign-in link is unknown or expired. Start again from Farshelf.',
+      );
     if (error || !code) {
       flow.error = error ?? 'no authorisation code';
     } else {
@@ -311,14 +359,24 @@ export class App extends EventEmitter {
         flow.error = errorMessage(err);
       }
     }
-    this.emit('oauth', { flowId: flow.id, ok: !!flow.result, email: flow.result?.email ?? null, error: flow.error ?? null });
+    this.emit('oauth', {
+      flowId: flow.id,
+      ok: !!flow.result,
+      email: flow.result?.email ?? null,
+      error: flow.error ?? null,
+    });
     return flow;
   }
 
   googleFlowStatus(flowId: string) {
     const f = this.oauthFlows.get(flowId);
     if (!f) throw new NotFoundError('sign-in flow');
-    return { done: !!f.result || !!f.error, ok: !!f.result, email: f.result?.email ?? null, error: f.error ?? null };
+    return {
+      done: !!f.result || !!f.error,
+      ok: !!f.result,
+      email: f.result?.email ?? null,
+      error: f.error ?? null,
+    };
   }
 
   async createRemote(raw: unknown): Promise<{ remote: RemoteInfo; recoveryKey: string | null }> {
@@ -366,7 +424,11 @@ export class App extends EventEmitter {
       });
       const existing = await probe.readVaultDoc();
       if (existing && !input.passphrase) {
-        throw new AppError(400, 'needs_passphrase', 'this location already holds an encrypted Farshelf remote; enter its passphrase');
+        throw new AppError(
+          400,
+          'needs_passphrase',
+          'this location already holds an encrypted Farshelf remote; enter its passphrase',
+        );
       }
       if (input.passphrase) {
         if (existing) masterKey = await unlockWithPassphrase(existing, input.passphrase);
@@ -383,14 +445,21 @@ export class App extends EventEmitter {
     }
 
     this.db
-      .prepare('insert into remotes (id, name, kind, config, encrypted, created_at) values (?, ?, ?, ?, ?, ?)')
+      .prepare(
+        'insert into remotes (id, name, kind, config, encrypted, created_at) values (?, ?, ?, ?, ?, ?)',
+      )
       .run(id, input.name, input.kind, JSON.stringify(config), masterKey ? 1 : 0, Date.now());
     const vault = await this.mountRemote(this.row(id));
     if (masterKey) {
       vault.setMasterKey(masterKey);
       if (this.secrets.secure) await this.secrets.set(`remote:${id}:master`, masterKey.toString('hex'));
     }
-    this.activity.add('info', 'remote', `Added ${input.kind} remote "${input.name}"${masterKey ? ' (encrypted)' : ''}`, { remoteId: id });
+    this.activity.add(
+      'info',
+      'remote',
+      `Added ${input.kind} remote "${input.name}"${masterKey ? ' (encrypted)' : ''}`,
+      { remoteId: id },
+    );
     this.indexRemote(id);
     this.emit('state');
     return { remote: this.listRemotes().find((r) => r.id === id)!, recoveryKey };
@@ -399,7 +468,8 @@ export class App extends EventEmitter {
   async removeRemote(id: string): Promise<void> {
     const row = this.row(id);
     this.jobs.deleteForRemote(id);
-    for (const k of ['password', 'refresh', 'clientSecret', 'master']) await this.secrets.delete(`remote:${id}:${k}`);
+    for (const k of ['password', 'refresh', 'clientSecret', 'master'])
+      await this.secrets.delete(`remote:${id}:${k}`);
     this.cache.invalidate(`${id}:`);
     this.db.prepare('delete from remotes where id = ?').run(id);
     this.vaults.delete(id);
@@ -411,8 +481,16 @@ export class App extends EventEmitter {
     const vault = this.vault(id);
     if (!vault.encrypted) return;
     const doc = await vault.readVaultDoc();
-    if (!doc) throw new AppError(500, 'vault_missing', 'the encryption key file (.farshelf/vault.json) is missing from this remote');
-    const key = 'passphrase' in input ? await unlockWithPassphrase(doc, input.passphrase) : unlockWithRecoveryKey(doc, input.recoveryKey);
+    if (!doc)
+      throw new AppError(
+        500,
+        'vault_missing',
+        'the encryption key file (.farshelf/vault.json) is missing from this remote',
+      );
+    const key =
+      'passphrase' in input
+        ? await unlockWithPassphrase(doc, input.passphrase)
+        : unlockWithRecoveryKey(doc, input.recoveryKey);
     vault.setMasterKey(key);
     if (this.secrets.secure) await this.secrets.set(`remote:${id}:master`, key.toString('hex'));
     this.activity.add('info', 'unlock', `Unlocked "${vault.remoteName}"`, { remoteId: id });
@@ -433,7 +511,9 @@ export class App extends EventEmitter {
     const doc = await vault.readVaultDoc();
     if (!doc) throw new AppError(400, 'not_encrypted', 'this remote is not encrypted');
     await vault.writeVaultDoc(await changePassphrase(doc, vault.getMasterKey(), passphrase));
-    this.activity.add('info', 'passphrase', `Changed the passphrase of "${vault.remoteName}"`, { remoteId: id });
+    this.activity.add('info', 'passphrase', `Changed the passphrase of "${vault.remoteName}"`, {
+      remoteId: id,
+    });
   }
 
   // ---------- files ----------
@@ -455,7 +535,12 @@ export class App extends EventEmitter {
     if (await vault.stat(p)) throw new ConflictError(`${baseName(p)} already exists`);
     await vault.mkdir(p);
     this.catalog.upsert(remoteId, { path: p, name: baseName(p), kind: 'dir', size: 0, mtime: Date.now() });
-    this.activity.add('info', 'mkdir', `Created folder ${p}${source === 'ai' ? ' (AI plan, approved)' : ''}`, { remoteId, path: p });
+    this.activity.add(
+      'info',
+      'mkdir',
+      `Created folder ${p}${source === 'ai' ? ' (AI plan, approved)' : ''}`,
+      { remoteId, path: p },
+    );
     this.changed(remoteId, parentOf(p));
   }
 
@@ -465,13 +550,19 @@ export class App extends EventEmitter {
     guardUserPath(to);
     if (normPath(from) === normPath(to)) return;
     if (isWithin(to, from)) throw new AppError(400, 'bad_move', 'cannot move a folder into itself');
-    if (this.pendingFor(remoteId).has(normPath(from))) throw new ConflictError('wait for the upload to finish before moving this file');
+    if (this.pendingFor(remoteId).has(normPath(from)))
+      throw new ConflictError('wait for the upload to finish before moving this file');
     if (!(await vault.stat(from))) throw new NotFoundError(from);
     if (await vault.stat(to)) throw new ConflictError(`${to} already exists`);
     if (vault.encrypted) await vault.mkdir(parentOf(to));
     await vault.move(from, to);
     this.catalog.moveTree(remoteId, from, to);
-    this.activity.add('info', 'move', `Moved ${from} → ${to}${source === 'ai' ? ' (AI plan, approved)' : ''}`, { remoteId, path: to });
+    this.activity.add(
+      'info',
+      'move',
+      `Moved ${from} → ${to}${source === 'ai' ? ' (AI plan, approved)' : ''}`,
+      { remoteId, path: to },
+    );
     this.changed(remoteId, parentOf(from));
     this.changed(remoteId, parentOf(to));
   }
@@ -480,11 +571,21 @@ export class App extends EventEmitter {
     const vault = this.vault(remoteId);
     guardUserPath(p);
     const n = normPath(p);
-    const pendingJob = this.jobs.list({ remoteId, states: ['queued', 'running', 'paused', 'failed'] }).find((j) => j.kind === 'upload' && j.path === n);
+    const pendingJob = this.jobs
+      .list({ remoteId, states: ['queued', 'running', 'paused', 'failed'] })
+      .find((j) => j.kind === 'upload' && j.path === n);
     if (pendingJob) {
       await this.jobs.cancel(pendingJob.id);
       this.changed(remoteId, parentOf(n));
-      return { id: '', remoteId, originalPath: n, name: baseName(n), kind: 'file', size: 0, trashedAt: Date.now() };
+      return {
+        id: '',
+        remoteId,
+        originalPath: n,
+        name: baseName(n),
+        kind: 'file',
+        size: 0,
+        trashedAt: Date.now(),
+      };
     }
     const st = await vault.stat(n);
     if (!st) throw new NotFoundError(n);
@@ -492,22 +593,42 @@ export class App extends EventEmitter {
     await vault.backend.mkdir(`${TRASH_DIR}/${id}`);
     await vault.backend.move(vault.remotePath(n), vault.trashPath(id, st.name));
     vault.invalidate(n);
-    const item: TrashItem = { id, remoteId, originalPath: n, name: st.name, kind: st.kind, size: st.size, trashedAt: Date.now() };
+    const item: TrashItem = {
+      id,
+      remoteId,
+      originalPath: n,
+      name: st.name,
+      kind: st.kind,
+      size: st.size,
+      trashedAt: Date.now(),
+    };
     this.db
-      .prepare('insert into trash (id, remote_id, original_path, name, kind, size, trashed_at) values (?, ?, ?, ?, ?, ?, ?)')
+      .prepare(
+        'insert into trash (id, remote_id, original_path, name, kind, size, trashed_at) values (?, ?, ?, ?, ?, ?, ?)',
+      )
       .run(id, remoteId, n, st.name, st.kind, st.size, item.trashedAt);
     this.catalog.removeTree(remoteId, n);
-    this.activity.add('info', 'trash', `Moved ${n} to trash${source === 'ai' ? ' (AI plan, approved)' : ''}`, { remoteId, path: n });
+    this.activity.add(
+      'info',
+      'trash',
+      `Moved ${n} to trash${source === 'ai' ? ' (AI plan, approved)' : ''}`,
+      { remoteId, path: n },
+    );
     this.changed(remoteId, parentOf(n));
     this.emit('trash');
     return item;
   }
 
   listTrash(remoteId?: string): TrashItem[] {
-    const cols = 'id, remote_id as remoteId, original_path as originalPath, name, kind, size, trashed_at as trashedAt';
+    const cols =
+      'id, remote_id as remoteId, original_path as originalPath, name, kind, size, trashed_at as trashedAt';
     return (remoteId
-      ? this.db.prepare(`select ${cols} from trash where remote_id = ? order by trashed_at desc`).all(remoteId)
-      : this.db.prepare(`select ${cols} from trash order by trashed_at desc`).all()) as unknown as TrashItem[];
+      ? this.db
+          .prepare(`select ${cols} from trash where remote_id = ? order by trashed_at desc`)
+          .all(remoteId)
+      : this.db
+          .prepare(`select ${cols} from trash order by trashed_at desc`)
+          .all()) as unknown as TrashItem[];
   }
 
   private trashItem(id: string): TrashItem {
@@ -526,7 +647,18 @@ export class App extends EventEmitter {
     await vault.backend.remove(`${TRASH_DIR}/${item.id}`).catch(() => undefined);
     vault.invalidate(target);
     this.db.prepare('delete from trash where id = ?').run(trashId);
-    this.activity.add('info', 'restore', `Restored ${target} from trash`, { remoteId: item.remoteId, path: target });
+    this.catalog.upsert(item.remoteId, {
+      path: target,
+      name: baseName(target),
+      kind: item.kind,
+      size: item.size,
+      mtime: Date.now(),
+    });
+    if (item.kind === 'dir') this.indexRemote(item.remoteId, target); // re-index the restored subtree for search
+    this.activity.add('info', 'restore', `Restored ${target} from trash`, {
+      remoteId: item.remoteId,
+      path: target,
+    });
     this.changed(item.remoteId, parentOf(target));
     this.emit('trash');
     return target;
@@ -538,7 +670,10 @@ export class App extends EventEmitter {
     const vault = this.vault(item.remoteId);
     await vault.backend.remove(`${TRASH_DIR}/${item.id}`);
     this.db.prepare('delete from trash where id = ?').run(trashId);
-    this.activity.add('info', 'purge', `Permanently deleted ${item.originalPath}`, { remoteId: item.remoteId, path: item.originalPath });
+    this.activity.add('info', 'purge', `Permanently deleted ${item.originalPath}`, {
+      remoteId: item.remoteId,
+      path: item.originalPath,
+    });
     this.emit('trash');
   }
 
@@ -572,7 +707,8 @@ export class App extends EventEmitter {
     let finalPath = normPath(target);
     const pending = this.pendingFor(remoteId);
     if (opts.autoRename) {
-      for (let i = 1; pending.has(finalPath) || (await vault.stat(finalPath)); i++) finalPath = withSuffix(normPath(target), i);
+      for (let i = 1; pending.has(finalPath) || (await vault.stat(finalPath)); i++)
+        finalPath = withSuffix(normPath(target), i);
     } else {
       const existing = await vault.stat(finalPath);
       if (existing?.kind === 'dir') throw new ConflictError(`${finalPath} is a folder`);
@@ -604,15 +740,29 @@ export class App extends EventEmitter {
   enqueueUpload(remoteId: string, target: string, spoolPath: string, size: number, mtime: number): JobInfo {
     const vault = this.vault(remoteId);
     const header = vault.encrypted ? newFile(vault.getMasterKey()).header.toString('base64') : null;
-    const job = this.jobs.create('upload', remoteId, baseName(target), normPath(target), { spoolPath, size, mtime, header, state: null }, vault.storedSize(size));
-    if (this.settingsValue.lastUploadRemoteId !== remoteId) void this.updateSettings({ lastUploadRemoteId: remoteId });
+    const job = this.jobs.create(
+      'upload',
+      remoteId,
+      baseName(target),
+      normPath(target),
+      { spoolPath, size, mtime, header, state: null },
+      vault.storedSize(size),
+    );
+    if (this.settingsValue.lastUploadRemoteId !== remoteId)
+      void this.updateSettings({ lastUploadRemoteId: remoteId });
     this.changed(remoteId, parentOf(target));
     return job;
   }
 
   private async runUpload(job: JobInfo, ctx: JobContext): Promise<void> {
     const vault = this.vault(job.remoteId);
-    const p = ctx.payload as { spoolPath: string; size: number; mtime: number; header: string | null; state: Record<string, unknown> | null };
+    const p = ctx.payload as {
+      spoolPath: string;
+      size: number;
+      mtime: number;
+      header: string | null;
+      state: Record<string, unknown> | null;
+    };
     const backend = vault.backend;
     const stored = vault.storedSize(p.size);
     const remotePath = vault.remotePath(job.path);
@@ -663,26 +813,43 @@ export class App extends EventEmitter {
     if (ctx.signal.aborted) return;
     await fs.rm(p.spoolPath, { force: true });
     vault.invalidate(job.path);
-    this.catalog.upsert(job.remoteId, { path: job.path, name: baseName(job.path), kind: 'file', size: p.size, mtime: Date.now() });
-    this.activity.add('info', 'upload', `Uploaded ${job.path} (${formatBytes(p.size)})`, { remoteId: job.remoteId, path: job.path });
+    this.catalog.upsert(job.remoteId, {
+      path: job.path,
+      name: baseName(job.path),
+      kind: 'file',
+      size: p.size,
+      mtime: Date.now(),
+    });
+    this.activity.add('info', 'upload', `Uploaded ${job.path} (${formatBytes(p.size)})`, {
+      remoteId: job.remoteId,
+      path: job.path,
+    });
     queueMicrotask(() => this.changed(job.remoteId, parentOf(job.path)));
   }
 
   private async cleanupUpload(job: JobInfo, payload: Record<string, unknown>): Promise<void> {
     await fs.rm(String(payload.spoolPath), { force: true });
     const vault = this.vaults.get(job.remoteId);
-    if (vault && payload.state) await vault.backend.abortUpload(payload.state as Record<string, unknown>).catch(() => undefined);
-    this.activity.add('info', 'upload', `Cancelled upload of ${job.path}`, { remoteId: job.remoteId, path: job.path });
+    if (vault && payload.state)
+      await vault.backend.abortUpload(payload.state as Record<string, unknown>).catch(() => undefined);
+    this.activity.add('info', 'upload', `Cancelled upload of ${job.path}`, {
+      remoteId: job.remoteId,
+      path: job.path,
+    });
     this.changed(job.remoteId, parentOf(job.path));
   }
 
   // ---------- indexing & search ----------
 
   indexRemote(remoteId: string, root = '/'): JobInfo {
-    const existing = this.jobs.list({ remoteId, states: ['queued', 'running'] }).find((j) => j.kind === 'index');
+    const existing = this.jobs
+      .list({ remoteId, states: ['queued', 'running'] })
+      .find((j) => j.kind === 'index');
     if (existing) return existing;
     const vault = this.vault(remoteId);
-    return this.jobs.create('index', remoteId, `Index ${vault.remoteName}`, normPath(root), { root: normPath(root) });
+    return this.jobs.create('index', remoteId, `Index ${vault.remoteName}`, normPath(root), {
+      root: normPath(root),
+    });
   }
 
   private async runIndex(job: JobInfo, ctx: JobContext): Promise<void> {
@@ -700,7 +867,9 @@ export class App extends EventEmitter {
       }
       ctx.progress(dirs, dirs + queue.length);
     }
-    this.activity.add('info', 'index', `Indexed ${files} files in ${dirs} folders`, { remoteId: job.remoteId });
+    this.activity.add('info', 'index', `Indexed ${files} files in ${dirs} folders`, {
+      remoteId: job.remoteId,
+    });
   }
 
   search(filter: SearchFilter) {
@@ -714,7 +883,8 @@ function guardUserPath(p: string): void {
   const n = normPath(p);
   if (n === '/') throw new AppError(400, 'bad_path', 'that operation is not allowed on the root folder');
   const first = n.split('/')[1] ?? '';
-  if (first.startsWith('.farshelf')) throw new AppError(400, 'bad_path', 'that path is reserved for Farshelf');
+  if (first.startsWith('.farshelf'))
+    throw new AppError(400, 'bad_path', 'that path is reserved for Farshelf');
 }
 
 export function withSuffix(p: string, i: number): string {

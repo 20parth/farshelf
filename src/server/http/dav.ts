@@ -11,11 +11,16 @@ import { handleError, mimeType, readBody, type Req, type Res } from './util.ts';
 export const DAV_PREFIX = '/dav';
 
 // macOS/Windows metadata files: kept in memory only, never uploaded to the user's storage.
-const JUNK = /^(\.DS_Store|\._.*|\.localized|\.TemporaryItems|\.Trashes|\.Spotlight-V100|\.fseventsd|\.metadata_never_index.*|\.ql_.*|desktop\.ini|Thumbs\.db)$/;
+const JUNK =
+  /^(\.DS_Store|\._.*|\.localized|\.TemporaryItems|\.Trashes|\.Spotlight-V100|\.fseventsd|\.metadata_never_index.*|\.ql_.*|desktop\.ini|Thumbs\.db)$/;
 const junkStore = new Map<string, { data: Buffer; mtime: number }>();
 const JUNK_LIMIT = 256 * 1024;
 
-const xmlEscape = (s: string) => s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]!);
+const xmlEscape = (s: string) =>
+  s.replace(
+    /[<>&'"]/g,
+    (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]!,
+  );
 const hrefFor = (segments: string[], dir: boolean) =>
   DAV_PREFIX + '/' + segments.map(encodeURIComponent).join('/') + (dir && segments.length ? '/' : '');
 
@@ -27,7 +32,10 @@ interface Located {
 
 function locate(app: App, pathname: string): Located {
   const rest = pathname.slice(DAV_PREFIX.length);
-  const segments = rest.split('/').filter(Boolean).map((s) => decodeURIComponent(s));
+  const segments = rest
+    .split('/')
+    .filter(Boolean)
+    .map((s) => decodeURIComponent(s));
   if (!segments.length) return { vault: null, path: '/', segments };
   const vault = app.vaultByName(segments[0]!);
   if (!vault) throw new NotFoundError(segments[0]!);
@@ -47,7 +55,9 @@ ${p.dir ? '' : `<D:getcontentlength>${p.size}</D:getcontentlength><D:getcontentt
 }
 
 function multistatus(res: Res, body: string): void {
-  const data = Buffer.from(`<?xml version="1.0" encoding="utf-8"?>\n<D:multistatus xmlns:D="DAV:">${body}</D:multistatus>`);
+  const data = Buffer.from(
+    `<?xml version="1.0" encoding="utf-8"?>\n<D:multistatus xmlns:D="DAV:">${body}</D:multistatus>`,
+  );
   res.writeHead(207, { 'content-type': 'application/xml; charset=utf-8', 'content-length': data.length });
   res.end(data);
 }
@@ -58,7 +68,8 @@ function empty(res: Res, status: number, headers: Record<string, string> = {}): 
 }
 
 function requireVault(loc: Located): Vault {
-  if (!loc.vault || loc.path === '/') throw new AppError(403, 'forbidden', 'cannot modify the top level of the Farshelf drive');
+  if (!loc.vault || loc.path === '/')
+    throw new AppError(403, 'forbidden', 'cannot modify the top level of the Farshelf drive');
   return loc.vault;
 }
 
@@ -95,7 +106,8 @@ async function route(app: App, req: Req, res: Res, url: URL): Promise<void> {
   const name = loc.segments.at(-1) ?? '';
   const junkKey = `${loc.vault?.remoteId}:${loc.path}`;
 
-  if (JUNK.test(name) && !['LOCK', 'UNLOCK', 'PROPPATCH'].includes(method)) return handleJunk(req, res, method, junkKey, loc);
+  if (JUNK.test(name) && !['LOCK', 'UNLOCK', 'PROPPATCH'].includes(method))
+    return handleJunk(req, res, method, junkKey, loc);
 
   switch (method) {
     case 'PROPFIND': {
@@ -104,18 +116,34 @@ async function route(app: App, req: Req, res: Res, url: URL): Promise<void> {
       if (!loc.vault) {
         let body = propXml(DAV_PREFIX + '/', { name: 'Farshelf', dir: true, size: 0, mtime: Date.now() });
         if (depth) {
-          for (const r of app.listRemotes()) body += propXml(hrefFor([r.name], true), { name: r.name, dir: true, size: 0, mtime: r.createdAt });
+          for (const r of app.listRemotes())
+            body += propXml(hrefFor([r.name], true), {
+              name: r.name,
+              dir: true,
+              size: 0,
+              mtime: r.createdAt,
+            });
         }
         return multistatus(res, body);
       }
       const st = await loc.vault.stat(loc.path);
       if (!st) return empty(res, 404);
       const isDir = st.kind === 'dir';
-      let body = propXml(hrefFor(loc.segments, isDir), { name: loc.path === '/' ? loc.vault.remoteName : st.name, dir: isDir, size: st.size, mtime: st.mtime });
+      let body = propXml(hrefFor(loc.segments, isDir), {
+        name: loc.path === '/' ? loc.vault.remoteName : st.name,
+        dir: isDir,
+        size: st.size,
+        mtime: st.mtime,
+      });
       if (isDir && depth) {
         const entries = await app.list(loc.vault.remoteId, loc.path);
         for (const e of entries) {
-          body += propXml(hrefFor([...loc.segments, e.name], e.kind === 'dir'), { name: e.name, dir: e.kind === 'dir', size: e.size, mtime: e.mtime });
+          body += propXml(hrefFor([...loc.segments, e.name], e.kind === 'dir'), {
+            name: e.name,
+            dir: e.kind === 'dir',
+            size: e.size,
+            mtime: e.mtime,
+          });
         }
       }
       return multistatus(res, body);
@@ -138,7 +166,9 @@ async function route(app: App, req: Req, res: Res, url: URL): Promise<void> {
       if (!parent || parent.kind !== 'dir') return empty(res, 409);
       const existed = !!(await vault.stat(loc.path));
       const declared = req.headers['x-expected-entity-length'] ?? req.headers['content-length'];
-      await app.receiveUpload(vault.remoteId, loc.path, req, { expectedSize: declared !== undefined ? Number(declared) : undefined });
+      await app.receiveUpload(vault.remoteId, loc.path, req, {
+        expectedSize: declared !== undefined ? Number(declared) : undefined,
+      });
       return empty(res, existed ? 204 : 201);
     }
     case 'MKCOL': {
@@ -172,8 +202,14 @@ async function route(app: App, req: Req, res: Res, url: URL): Promise<void> {
       } else {
         const st = await vault.stat(loc.path);
         if (!st) return empty(res, 404);
-        if (st.kind === 'dir') throw new ConflictError('copying folders over WebDAV is not supported yet; copy the files instead');
-        await app.receiveUpload(vault.remoteId, dest.path, Readable.from(vault.readRange(loc.path, 0, st.size)), { expectedSize: st.size });
+        if (st.kind === 'dir')
+          throw new ConflictError('copying folders over WebDAV is not supported yet; copy the files instead');
+        await app.receiveUpload(
+          vault.remoteId,
+          dest.path,
+          Readable.from(vault.readRange(loc.path, 0, st.size)),
+          { expectedSize: st.size },
+        );
       }
       return empty(res, destExists ? 204 : 201);
     }
@@ -192,7 +228,10 @@ async function route(app: App, req: Req, res: Res, url: URL): Promise<void> {
     case 'PROPPATCH': {
       await readBody(req);
       // Accept and ignore (Finder sets Apple-specific properties); report success so copies don't fail.
-      return multistatus(res, `<D:response><D:href>${xmlEscape(url.pathname)}</D:href><D:propstat><D:prop/><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`);
+      return multistatus(
+        res,
+        `<D:response><D:href>${xmlEscape(url.pathname)}</D:href><D:propstat><D:prop/><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>`,
+      );
     }
     default:
       return empty(res, 405);
@@ -218,7 +257,15 @@ async function handleJunk(req: Req, res: Res, method: string, key: string, loc: 
       await readBody(req);
       const item = junkStore.get(key);
       if (!item) return empty(res, 404);
-      return multistatus(res, propXml(hrefFor(loc.segments, false), { name: baseName(loc.path), dir: false, size: item.data.length, mtime: item.mtime }));
+      return multistatus(
+        res,
+        propXml(hrefFor(loc.segments, false), {
+          name: baseName(loc.path),
+          dir: false,
+          size: item.data.length,
+          mtime: item.mtime,
+        }),
+      );
     }
     case 'DELETE':
       junkStore.delete(key);

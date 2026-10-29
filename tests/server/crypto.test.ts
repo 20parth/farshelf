@@ -25,7 +25,9 @@ import { FAST_KDF, randomData } from './helpers.ts';
 
 async function encryptAll(master: Buffer, plain: Buffer) {
   const fc = newFile(master);
-  const ct = await ciphertextRange(fc, plain.length, 0, encryptedSize(plain.length), async (o, l) => plain.subarray(o, o + l));
+  const ct = await ciphertextRange(fc, plain.length, 0, encryptedSize(plain.length), async (o, l) =>
+    plain.subarray(o, o + l),
+  );
   return { fc, ct };
 }
 
@@ -44,19 +46,27 @@ function decryptAll(master: Buffer, ct: Buffer): Buffer {
 describe('file format', () => {
   const master = randomBytes(32);
 
-  it.each([0, 1, SEGMENT_SIZE - 1, SEGMENT_SIZE, SEGMENT_SIZE + 1, 3 * SEGMENT_SIZE + 12345])('round-trips %i bytes', async (n) => {
-    const plain = randomData(n);
-    const { ct } = await encryptAll(master, plain);
-    expect(ct.length).toBe(encryptedSize(n));
-    expect(plainSize(ct.length)).toBe(n);
-    expect(decryptAll(master, ct).equals(plain)).toBe(true);
-  });
+  it.each([0, 1, SEGMENT_SIZE - 1, SEGMENT_SIZE, SEGMENT_SIZE + 1, 3 * SEGMENT_SIZE + 12345])(
+    'round-trips %i bytes',
+    async (n) => {
+      const plain = randomData(n);
+      const { ct } = await encryptAll(master, plain);
+      expect(ct.length).toBe(encryptedSize(n));
+      expect(plainSize(ct.length)).toBe(n);
+      expect(decryptAll(master, ct).equals(plain)).toBe(true);
+    },
+  );
 
   it('produces identical bytes for any sub-range (needed for resumable uploads)', async () => {
     const plain = randomData(2 * SEGMENT_SIZE + 999);
     const { fc, ct } = await encryptAll(master, plain);
     const read = async (o: number, l: number) => plain.subarray(o, o + l);
-    for (const [a, b] of [[0, 10], [HEADER_SIZE - 5, HEADER_SIZE + 5], [SEGMENT_SIZE, SEGMENT_SIZE + 100], [100, ct.length]]) {
+    for (const [a, b] of [
+      [0, 10],
+      [HEADER_SIZE - 5, HEADER_SIZE + 5],
+      [SEGMENT_SIZE, SEGMENT_SIZE + 100],
+      [100, ct.length],
+    ]) {
       const part = await ciphertextRange(fc, plain.length, a!, b!, read);
       expect(part.equals(ct.subarray(a, b))).toBe(true);
     }
@@ -103,9 +113,13 @@ describe('vault keys', () => {
     const { doc, masterKey, recoveryKey } = await createVault('correct horse battery', FAST_KDF);
     expect(recoveryKey).toMatch(/^([0-9A-Z]{4}-){12}[0-9A-Z]{4}$/);
     expect((await unlockWithPassphrase(doc, 'correct horse battery')).equals(masterKey)).toBe(true);
-    expect(unlockWithRecoveryKey(doc, recoveryKey.toLowerCase().replace(/-/g, ' ')).equals(masterKey)).toBe(true);
+    expect(unlockWithRecoveryKey(doc, recoveryKey.toLowerCase().replace(/-/g, ' ')).equals(masterKey)).toBe(
+      true,
+    );
     await expect(unlockWithPassphrase(doc, 'wrong passphrase')).rejects.toThrow(/wrong passphrase/);
-    expect(() => unlockWithRecoveryKey(doc, encodeRecoveryKey(randomBytes(32)))).toThrow(/wrong recovery key/);
+    expect(() => unlockWithRecoveryKey(doc, encodeRecoveryKey(randomBytes(32)))).toThrow(
+      /wrong recovery key/,
+    );
     expect(JSON.stringify(doc)).not.toContain(masterKey.toString('base64'));
   });
 

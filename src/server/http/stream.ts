@@ -5,7 +5,13 @@ import { baseName } from '../paths.ts';
 import type { Vault } from '../vault.ts';
 import { contentDisposition, mimeType, parseRange, pipeChunks, type Req, type Res } from './util.ts';
 
-export async function serveFile(vault: Vault, p: string, req: Req, res: Res, opts: { download?: boolean } = {}): Promise<void> {
+export async function serveFile(
+  vault: Vault,
+  p: string,
+  req: Req,
+  res: Res,
+  opts: { download?: boolean } = {},
+): Promise<void> {
   const st = await vault.stat(p);
   if (!st || st.kind !== 'file') throw new NotFoundError(p);
   const etag = `"${st.storedSize.toString(36)}-${Math.round(st.mtime).toString(36)}"`;
@@ -17,7 +23,8 @@ export async function serveFile(vault: Vault, p: string, req: Req, res: Res, opt
     'content-disposition': contentDisposition(baseName(p), !!opts.download),
     'cache-control': 'private, no-cache',
     // Never let a stored HTML/SVG file run script in Farshelf's origin.
-    'content-security-policy': "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox",
+    'content-security-policy':
+      "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'unsafe-inline'; sandbox",
     'x-content-type-options': 'nosniff',
   };
   if (req.headers['if-none-match'] === etag) {
@@ -53,7 +60,13 @@ export async function serveFile(vault: Vault, p: string, req: Req, res: Res, opt
 }
 
 /** GET /stream/<remoteId>/<path>?sig=... — signed links work without a session, so they can be pasted into VLC/IINA. */
-export async function handleStream(app: App, req: Req, res: Res, url: URL, authed: boolean): Promise<boolean> {
+export async function handleStream(
+  app: App,
+  req: Req,
+  res: Res,
+  url: URL,
+  authed: boolean,
+): Promise<boolean> {
   const m = url.pathname.match(/^\/stream\/([^/]+)(\/.*)$/);
   if (!m) return false;
   const remoteId = decodeURIComponent(m[1]!);

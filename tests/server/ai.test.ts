@@ -23,9 +23,11 @@ beforeAll(async () => {
     await new Promise((r) => setTimeout(r, delayMs));
     res.setHeader('content-type', 'application/json');
     if (req.url === '/api/tags') return res.end(JSON.stringify({ models: [{ name: 'llama3.2:latest' }] }));
-    if (req.url === '/api/chat') return res.end(JSON.stringify({ message: { role: 'assistant', content: reply } }));
+    if (req.url === '/api/chat')
+      return res.end(JSON.stringify({ message: { role: 'assistant', content: reply } }));
     if (req.url === '/v1/models') return res.end(JSON.stringify({ data: [{ id: 'gpt-test' }] }));
-    if (req.url === '/v1/chat/completions') return res.end(JSON.stringify({ choices: [{ message: { content: reply } }] }));
+    if (req.url === '/v1/chat/completions')
+      return res.end(JSON.stringify({ choices: [{ message: { content: reply } }] }));
     res.statusCode = 404;
     res.end('{}');
   });
@@ -37,14 +39,18 @@ beforeEach(() => {
   delayMs = 0;
 });
 
-const ollama = () => makeProvider(aiSettings.parse({ enabled: true, baseUrl: mockBase, model: 'llama3.2' }), null);
+const ollama = () =>
+  makeProvider(aiSettings.parse({ enabled: true, baseUrl: mockBase, model: 'llama3.2' }), null);
 
 describe('providers', () => {
   it('talks to Ollama and OpenAI-compatible endpoints', async () => {
     expect(await ollama().models()).toEqual(['llama3.2:latest']);
     reply = '{"a":1}';
     expect(await ollama().chat([{ role: 'user', content: 'hi' }])).toBe('{"a":1}');
-    const openai = makeProvider(aiSettings.parse({ enabled: true, provider: 'openai', baseUrl: `${mockBase}/v1`, model: 'gpt-test' }), 'sk-test');
+    const openai = makeProvider(
+      aiSettings.parse({ enabled: true, provider: 'openai', baseUrl: `${mockBase}/v1`, model: 'gpt-test' }),
+      'sk-test',
+    );
     expect(await openai.chat([{ role: 'user', content: 'hi' }])).toBe('{"a":1}');
     expect(lastAuth).toBe('Bearer sk-test');
     expect(lastBody.model).toBe('gpt-test');
@@ -58,7 +64,10 @@ describe('providers', () => {
   it('times out slow providers', async () => {
     delayMs = 300;
     const p = makeProvider(aiSettings.parse({ enabled: true, baseUrl: mockBase, timeoutMs: 1000 }), null);
-    const fast = makeProvider({ ...aiSettings.parse({ enabled: true, baseUrl: mockBase }), timeoutMs: 100 }, null);
+    const fast = makeProvider(
+      { ...aiSettings.parse({ enabled: true, baseUrl: mockBase }), timeoutMs: 100 },
+      null,
+    );
     await expect(fast.models()).rejects.toThrow(/did not answer/);
     await expect(p.models()).resolves.toBeDefined();
   });
@@ -85,8 +94,17 @@ describe('natural-language search', () => {
 
 describe('plans', () => {
   it('accepts well-formed plans', async () => {
-    reply = JSON.stringify({ summary: 'Group stems', steps: [{ tool: 'mkdir', path: '/Music/stems' }, { tool: 'move', from: '/Music/a.wav', to: '/Music/stems/a.wav' }] });
-    const plan = await aiPlanSteps(ollama(), 'group wavs', { cwd: '/Music', entries: [{ name: 'a.wav', kind: 'file', size: 1, modified: '2026-01-01' }] });
+    reply = JSON.stringify({
+      summary: 'Group stems',
+      steps: [
+        { tool: 'mkdir', path: '/Music/stems' },
+        { tool: 'move', from: '/Music/a.wav', to: '/Music/stems/a.wav' },
+      ],
+    });
+    const plan = await aiPlanSteps(ollama(), 'group wavs', {
+      cwd: '/Music',
+      entries: [{ name: 'a.wav', kind: 'file', size: 1, modified: '2026-01-01' }],
+    });
     expect(plan.steps).toHaveLength(2);
   });
 
@@ -107,14 +125,26 @@ describe('AI API endpoints', () => {
   let plainId: string;
   let encId: string;
   const api = (p: string, body?: unknown) =>
-    fetch(base + p, { method: 'POST', headers: { cookie: `farshelf_session=${app.auth.apiToken}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    fetch(base + p, {
+      method: 'POST',
+      headers: { cookie: `farshelf_session=${app.auth.apiToken}`, 'content-type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
   beforeEach(async () => {
     ({ app } = await makeApp());
     ({ base, close } = await serve(app));
     app.start();
-    plainId = (await app.createRemote({ kind: 'local', name: 'Plain', config: { root: await tmpDir() } })).remote.id;
-    encId = (await app.createRemote({ kind: 'local', name: 'Enc', config: { root: await tmpDir() }, passphrase: 'a long passphrase' })).remote.id;
+    plainId = (await app.createRemote({ kind: 'local', name: 'Plain', config: { root: await tmpDir() } }))
+      .remote.id;
+    encId = (
+      await app.createRemote({
+        kind: 'local',
+        name: 'Enc',
+        config: { root: await tmpDir() },
+        passphrase: 'a long passphrase',
+      })
+    ).remote.id;
     await app.mkdir(plainId, '/Secret project name');
     await app.mkdir(encId, '/Secret project name');
     await waitJobsIdle(app);
@@ -136,7 +166,9 @@ describe('AI API endpoints', () => {
     expect(JSON.stringify(lastBody)).not.toContain('Secret project name');
     await api('/api/ai/plan', { request: 'tidy up', remoteId: plainId, cwd: '/', shareNames: true });
     expect(JSON.stringify(lastBody)).toContain('Secret project name');
-    const res = await (await api('/api/ai/plan', { request: 'tidy up', remoteId: encId, cwd: '/', shareNames: true })).json();
+    const res = await (
+      await api('/api/ai/plan', { request: 'tidy up', remoteId: encId, cwd: '/', shareNames: true })
+    ).json();
     expect(JSON.stringify(lastBody)).not.toContain('Secret project name');
     expect(res.encryptedWithheld).toBe(true);
   });
@@ -149,7 +181,14 @@ describe('AI API endpoints', () => {
 
   it('does not execute anything itself: plans leave storage unchanged', async () => {
     reply = JSON.stringify({ summary: 'trash it', steps: [{ tool: 'trash', path: '/Secret project name' }] });
-    const out = await (await api('/api/ai/plan', { request: 'delete everything', remoteId: plainId, cwd: '/', shareNames: true })).json();
+    const out = await (
+      await api('/api/ai/plan', {
+        request: 'delete everything',
+        remoteId: plainId,
+        cwd: '/',
+        shareNames: true,
+      })
+    ).json();
     expect(out.plan.steps).toHaveLength(1);
     expect(await app.vault(plainId).stat('/Secret project name')).not.toBeNull();
   });

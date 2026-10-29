@@ -34,14 +34,25 @@ class MacKeychain implements SecretStore {
   readonly kind = 'macos-keychain';
   readonly secure = true;
   async get(key: string) {
-    const r = await run('/usr/bin/security', ['find-generic-password', '-s', SERVICE, '-a', safeKey(key), '-w']);
+    const r = await run('/usr/bin/security', [
+      'find-generic-password',
+      '-s',
+      SERVICE,
+      '-a',
+      safeKey(key),
+      '-w',
+    ]);
     if (r.code !== 0) return null;
     return Buffer.from(r.stdout.trim(), 'hex').toString('utf8');
   }
   async set(key: string, value: string) {
     // Pass the secret on stdin (interactive mode) so it never appears in the process list.
     const hex = Buffer.from(value, 'utf8').toString('hex');
-    const r = await run('/usr/bin/security', ['-i'], `add-generic-password -U -s ${SERVICE} -a ${safeKey(key)} -w ${hex}\n`);
+    const r = await run(
+      '/usr/bin/security',
+      ['-i'],
+      `add-generic-password -U -s ${SERVICE} -a ${safeKey(key)} -w ${hex}\n`,
+    );
     if (r.code !== 0) throw new Error('could not write to the macOS keychain');
   }
   async delete(key: string) {
@@ -57,7 +68,11 @@ class SecretService implements SecretStore {
     return r.code === 0 && r.stdout ? r.stdout : null;
   }
   async set(key: string, value: string) {
-    const r = await run('secret-tool', ['store', '--label', `Farshelf ${key}`, 'service', 'farshelf', 'key', safeKey(key)], value);
+    const r = await run(
+      'secret-tool',
+      ['store', '--label', `Farshelf ${key}`, 'service', 'farshelf', 'key', safeKey(key)],
+      value,
+    );
     if (r.code !== 0) throw new Error('could not write to the Secret Service keyring');
   }
   async delete(key: string) {
@@ -73,11 +88,16 @@ class DbSecrets implements SecretStore {
     this.db = db;
   }
   async get(key: string) {
-    const row = this.db.prepare('select value from secrets where key = ?').get(key) as { value: string } | undefined;
+    const row = this.db.prepare('select value from secrets where key = ?').get(key) as
+      { value: string } | undefined;
     return row?.value ?? null;
   }
   async set(key: string, value: string) {
-    this.db.prepare('insert into secrets (key, value) values (?, ?) on conflict(key) do update set value = excluded.value').run(key, value);
+    this.db
+      .prepare(
+        'insert into secrets (key, value) values (?, ?) on conflict(key) do update set value = excluded.value',
+      )
+      .run(key, value);
   }
   async delete(key: string) {
     this.db.prepare('delete from secrets where key = ?').run(key);
@@ -104,7 +124,10 @@ function hasSecretTool(): Promise<boolean> {
 }
 
 /** mode: 'auto' (default) | 'database' | 'memory' — tests use 'memory' so they never touch the real keychain. */
-export async function openSecretStore(db: Db, mode = process.env.FARSHELF_KEYCHAIN ?? 'auto'): Promise<SecretStore> {
+export async function openSecretStore(
+  db: Db,
+  mode = process.env.FARSHELF_KEYCHAIN ?? 'auto',
+): Promise<SecretStore> {
   if (mode === 'memory') return new MemorySecrets();
   if (mode === 'database') return new DbSecrets(db);
   if (process.platform === 'darwin') return new MacKeychain();

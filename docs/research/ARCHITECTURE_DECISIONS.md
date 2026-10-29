@@ -120,7 +120,7 @@ file contents. **NL search** sends only the user's question and gets back a
 Zod-validated filter, which runs locally in SQLite. **The assistant** may
 also receive the names, sizes and dates in the current folder, but only if
 you tick a box for each request. Names from encrypted remotes are never
-included. The model can only *propose* operations from a fixed tool list
+included. The model can only _propose_ operations from a fixed tool list
 (`mkdir`, `move`, `trash`). The UI shows them for approval and the daemon
 runs the approved ones. API keys go in the OS keychain when one is
 available, and otherwise in the database with a clear warning.

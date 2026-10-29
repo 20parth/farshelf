@@ -30,7 +30,8 @@ export class LocalBackend implements Backend {
   private abs(p: string): string {
     const rel = normPath(p).slice(1);
     const full = path.resolve(this.root, rel);
-    if (full !== this.root && !full.startsWith(this.root + path.sep)) throw new Error('path escapes backend root');
+    if (full !== this.root && !full.startsWith(this.root + path.sep))
+      throw new Error('path escapes backend root');
     return full;
   }
 
@@ -48,7 +49,12 @@ export class LocalBackend implements Backend {
       if (name.startsWith(PART_PREFIX)) continue;
       const st = await fs.lstat(path.join(dir, name)).catch(() => null);
       if (!st || st.isSymbolicLink()) continue; // never follow links out of the root
-      out.push({ name, kind: st.isDirectory() ? 'dir' : 'file', size: st.isDirectory() ? 0 : st.size, mtime: st.mtimeMs });
+      out.push({
+        name,
+        kind: st.isDirectory() ? 'dir' : 'file',
+        size: st.isDirectory() ? 0 : st.size,
+        mtime: st.mtimeMs,
+      });
     }
     return out;
   }

@@ -26,7 +26,11 @@ const b64 = (b: Uint8Array) => Buffer.from(b).toString('base64');
 const unb64 = (s: string) => Buffer.from(s, 'base64');
 const AAD = Buffer.from('farshelf-vault-v1');
 
-function scrypt(passphrase: string, salt: Buffer, params: { N: number; r: number; p: number }): Promise<Buffer> {
+function scrypt(
+  passphrase: string,
+  salt: Buffer,
+  params: { N: number; r: number; p: number },
+): Promise<Buffer> {
   return new Promise((resolve, reject) =>
     scryptCb(
       passphrase.normalize('NFKC'),
@@ -57,11 +61,7 @@ export function encodeRecoveryKey(bytes: Buffer): string {
 }
 
 export function decodeRecoveryKey(text: string): Buffer {
-  const clean = text
-    .toUpperCase()
-    .replace(/[\s-]/g, '')
-    .replace(/O/g, '0')
-    .replace(/[IL]/g, '1');
+  const clean = text.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
   if (clean.length !== 52) throw new DecryptError('a recovery key has 52 characters');
   let bits = '';
   for (const ch of clean) {
@@ -112,7 +112,11 @@ export function unlockWithRecoveryKey(doc: VaultDoc, recoveryKey: string): Buffe
 }
 
 /** Re-wrap the master key with a new passphrase (files are not re-encrypted). */
-export async function changePassphrase(doc: VaultDoc, masterKey: Buffer, passphrase: string): Promise<VaultDoc> {
+export async function changePassphrase(
+  doc: VaultDoc,
+  masterKey: Buffer,
+  passphrase: string,
+): Promise<VaultDoc> {
   const salt = randomBytes(16);
   const params = { N: doc.kdf.N, r: doc.kdf.r, p: doc.kdf.p };
   const key = await scrypt(passphrase, salt, params);
@@ -140,7 +144,8 @@ export class NameCipher {
 
   decrypt(encoded: string): string {
     const raw = Buffer.from(encoded, 'base64url');
-    if (raw.length < 12 + 16 || raw.toString('base64url') !== encoded) throw new DecryptError('not an encrypted name');
+    if (raw.length < 12 + 16 || raw.toString('base64url') !== encoded)
+      throw new DecryptError('not an encrypted name');
     const nonce = raw.subarray(0, 12);
     const plain = aesGcmDecrypt(this.encKey, nonce, raw.subarray(12));
     const expected = createHmac('sha256', this.macKey).update(plain).digest().subarray(0, 12);

@@ -40,7 +40,12 @@ const FIELDS = 'id,name,mimeType,size,modifiedTime';
 
 function toStat(f: DriveFile): RemoteStat {
   const dir = f.mimeType === FOLDER;
-  return { name: f.name, kind: dir ? 'dir' : 'file', size: dir ? 0 : Number(f.size ?? 0), mtime: Date.parse(f.modifiedTime ?? '') || 0 };
+  return {
+    name: f.name,
+    kind: dir ? 'dir' : 'file',
+    size: dir ? 0 : Number(f.size ?? 0),
+    mtime: Date.parse(f.modifiedTime ?? '') || 0,
+  };
 }
 
 const q = (s: string) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
@@ -80,9 +85,17 @@ export class GdriveBackend implements Backend {
       throw new TransientError('cannot reach Google sign-in', { cause: err });
     }
     if (res.status >= 500) throw new TransientError(`Google token endpoint returned ${res.status}`);
-    const json = (await res.json().catch(() => ({}))) as { access_token?: string; expires_in?: number; error?: string };
+    const json = (await res.json().catch(() => ({}))) as {
+      access_token?: string;
+      expires_in?: number;
+      error?: string;
+    };
     if (!res.ok || !json.access_token) {
-      throw new AppError(502, 'remote_auth', `Google refused the stored sign-in (${json.error ?? res.status}). Remove and re-add this remote.`);
+      throw new AppError(
+        502,
+        'remote_auth',
+        `Google refused the stored sign-in (${json.error ?? res.status}). Remove and re-add this remote.`,
+      );
     }
     this.accessToken = { value: json.access_token, expires: Date.now() + (json.expires_in ?? 3600) * 1000 };
     return json.access_token;
@@ -90,7 +103,13 @@ export class GdriveBackend implements Backend {
 
   private async api(url: string, init: RequestInit = {}): Promise<Response> {
     const doFetch = async () =>
-      fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), authorization: `Bearer ${await this.token()}` } });
+      fetch(url, {
+        ...init,
+        headers: {
+          ...(init.headers as Record<string, string>),
+          authorization: `Bearer ${await this.token()}`,
+        },
+      });
     let res: Response;
     try {
       res = await doFetch();
@@ -103,10 +122,12 @@ export class GdriveBackend implements Backend {
       if (err instanceof AppError) throw err;
       throw new TransientError('cannot reach Google Drive', { cause: err });
     }
-    if (res.status >= 500 || res.status === 429) throw new TransientError(`Google Drive returned ${res.status}`);
+    if (res.status >= 500 || res.status === 429)
+      throw new TransientError(`Google Drive returned ${res.status}`);
     if (res.status === 403) {
       const text = await res.clone().text();
-      if (/rateLimit|userRateLimitExceeded/.test(text)) throw new TransientError('Google Drive rate limit; will retry');
+      if (/rateLimit|userRateLimitExceeded/.test(text))
+        throw new TransientError('Google Drive rate limit; will retry');
     }
     return res;
   }
@@ -114,7 +135,11 @@ export class GdriveBackend implements Backend {
   private async json<T>(res: Response, what: string): Promise<T> {
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      throw new AppError(502, 'remote_error', `Google Drive ${what} failed (${res.status}) ${detail.slice(0, 200)}`);
+      throw new AppError(
+        502,
+        'remote_error',
+        `Google Drive ${what} failed (${res.status}) ${detail.slice(0, 200)}`,
+      );
     }
     return (await res.json()) as T;
   }
@@ -125,7 +150,10 @@ export class GdriveBackend implements Backend {
       fields: `files(${FIELDS})`,
       pageSize: '10',
     });
-    const out = await this.json<{ files: DriveFile[] }>(await this.api(`${this.ep.apiBase}/files?${params}`), 'lookup');
+    const out = await this.json<{ files: DriveFile[] }>(
+      await this.api(`${this.ep.apiBase}/files?${params}`),
+      'lookup',
+    );
     return out.files[0] ?? null;
   }
 
@@ -145,7 +173,10 @@ export class GdriveBackend implements Backend {
       q: `name = ${q(this.folderName)} and mimeType = '${FOLDER}' and 'root' in parents and trashed = false`,
       fields: `files(${FIELDS})`,
     });
-    const found = await this.json<{ files: DriveFile[] }>(await this.api(`${this.ep.apiBase}/files?${params}`), 'find root');
+    const found = await this.json<{ files: DriveFile[] }>(
+      await this.api(`${this.ep.apiBase}/files?${params}`),
+      'find root',
+    );
     const root = found.files[0] ?? (await this.createFolder('root', this.folderName));
     this.ids.set('/', root.id);
     return root.id;
@@ -219,7 +250,8 @@ export class GdriveBackend implements Backend {
     for (const part of parts) {
       cur += '/' + part;
       const existing = await this.findChild(parentId, part);
-      if (existing && existing.mimeType !== FOLDER) throw new ConflictError(`a file already exists at ${cur}`);
+      if (existing && existing.mimeType !== FOLDER)
+        throw new ConflictError(`a file already exists at ${cur}`);
       const folder = existing ?? (await this.createFolder(parentId, part));
       this.ids.set(cur, folder.id);
       parentId = folder.id;
@@ -266,7 +298,8 @@ export class GdriveBackend implements Backend {
     const f = await this.resolve(p);
     if (!f) return;
     const res = await this.api(`${this.ep.apiBase}/files/${encodeURIComponent(f.id)}`, { method: 'DELETE' });
-    if (!res.ok && res.status !== 404) throw new AppError(502, 'remote_error', `Google Drive delete failed (${res.status})`);
+    if (!res.ok && res.status !== 404)
+      throw new AppError(502, 'remote_error', `Google Drive delete failed (${res.status})`);
     this.forget(p);
   }
 
@@ -289,7 +322,8 @@ export class GdriveBackend implements Backend {
       body: JSON.stringify(existing ? {} : { name, parents: [parentId] }),
     });
     const session = res.headers.get('location');
-    if (!res.ok || !session) throw new AppError(502, 'remote_error', `Google Drive refused to start the upload (${res.status})`);
+    if (!res.ok || !session)
+      throw new AppError(502, 'remote_error', `Google Drive refused to start the upload (${res.status})`);
     return { path: normPath(p), size, session };
   }
 
@@ -305,11 +339,17 @@ export class GdriveBackend implements Backend {
       const m = range?.match(/bytes=0-(\d+)/);
       return m ? Number(m[1]) + 1 : 0;
     }
-    if (res.status === 404 || res.status === 410) throw new AppError(410, 'upload_expired', 'the upload session expired; restart the upload');
+    if (res.status === 404 || res.status === 410)
+      throw new AppError(410, 'upload_expired', 'the upload session expired; restart the upload');
     throw new AppError(502, 'remote_error', `Google Drive upload status failed (${res.status})`);
   }
 
-  async uploadChunk(state: UploadState, offset: number, data: Uint8Array, signal?: AbortSignal): Promise<void> {
+  async uploadChunk(
+    state: UploadState,
+    offset: number,
+    data: Uint8Array,
+    signal?: AbortSignal,
+  ): Promise<void> {
     const size = Number(state.size);
     const last = offset + data.length - 1;
     const res = await this.api(String(state.session), {
@@ -324,7 +364,8 @@ export class GdriveBackend implements Backend {
       if (offset + data.length === size) this.ids.delete(String(state.path));
       return;
     }
-    if (res.status === 404 || res.status === 410) throw new AppError(410, 'upload_expired', 'the upload session expired; restart the upload');
+    if (res.status === 404 || res.status === 410)
+      throw new AppError(410, 'upload_expired', 'the upload session expired; restart the upload');
     throw new AppError(502, 'remote_error', `Google Drive upload failed (${res.status})`);
   }
 
@@ -347,7 +388,12 @@ export interface OAuthFlow {
   error?: string;
 }
 
-export function startOAuth(clientId: string, clientSecret: string | undefined, redirectUri: string, ep = GOOGLE) {
+export function startOAuth(
+  clientId: string,
+  clientSecret: string | undefined,
+  redirectUri: string,
+  ep = GOOGLE,
+) {
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const flow: OAuthFlow = {
@@ -373,7 +419,11 @@ export function startOAuth(clientId: string, clientSecret: string | undefined, r
   return { flow, authUrl: `${ep.authUrl}?${params}` };
 }
 
-export async function finishOAuth(flow: OAuthFlow, code: string, ep = GOOGLE): Promise<{ refreshToken: string; email: string | null }> {
+export async function finishOAuth(
+  flow: OAuthFlow,
+  code: string,
+  ep = GOOGLE,
+): Promise<{ refreshToken: string; email: string | null }> {
   const body = new URLSearchParams({
     grant_type: 'authorization_code',
     code,
@@ -383,15 +433,25 @@ export async function finishOAuth(flow: OAuthFlow, code: string, ep = GOOGLE): P
     ...(flow.clientSecret ? { client_secret: flow.clientSecret } : {}),
   });
   const res = await fetch(ep.tokenUrl, { method: 'POST', body });
-  const json = (await res.json().catch(() => ({}))) as { refresh_token?: string; id_token?: string; error?: string; error_description?: string };
+  const json = (await res.json().catch(() => ({}))) as {
+    refresh_token?: string;
+    id_token?: string;
+    error?: string;
+    error_description?: string;
+  };
   if (!res.ok || !json.refresh_token) {
-    throw new AppError(502, 'oauth_failed', `Google sign-in failed: ${json.error_description ?? json.error ?? res.status}`);
+    throw new AppError(
+      502,
+      'oauth_failed',
+      `Google sign-in failed: ${json.error_description ?? json.error ?? res.status}`,
+    );
   }
   let email: string | null = null;
   if (json.id_token) {
     try {
       // Received directly from Google's token endpoint over TLS, so the payload is only decoded for display.
-      email = JSON.parse(Buffer.from(json.id_token.split('.')[1] ?? '', 'base64url').toString()).email ?? null;
+      email =
+        JSON.parse(Buffer.from(json.id_token.split('.')[1] ?? '', 'base64url').toString()).email ?? null;
     } catch {
       email = null;
     }

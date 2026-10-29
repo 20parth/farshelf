@@ -17,26 +17,45 @@ const HELP = `Farshelf — your storage, streamed like a local disk.
 
 Usage:
   farshelf start [--port 7420] [--host 127.0.0.1] [--no-open]   Start the daemon and open the UI
+                 [--secrets auto|database|memory]               where to keep sign-ins and keys (default: OS keychain)
   farshelf url                                                  Print the login link for the running daemon
   farshelf decrypt <encrypted-folder> <output-folder>           Decrypt a local copy of an encrypted remote
                    [--recovery-key]                             (prompts for passphrase or recovery key)
   farshelf reset --yes                                          Delete all Farshelf data on this machine
                                                                 (your remote files are not touched)
+Options:
+  --home <dir>    data directory for this command (overrides FARSHELF_HOME)
 Environment:
   FARSHELF_HOME   data directory (default: OS app-data folder)
   FARSHELF_PORT   port (default 7420)       FARSHELF_HOST   bind address (default 127.0.0.1)
 `;
 
 async function main(): Promise<void> {
-  const [cmd = 'help', ...rest] = process.argv.slice(2);
+  const [cmd = 'help', ...args] = process.argv.slice(2);
   const { defaultDataDir } = await import('./paths.ts');
-  const dataDir = defaultDataDir();
+  // --home <dir> works with every command and overrides FARSHELF_HOME.
+  const homeAt = args.indexOf('--home');
+  const rest = homeAt >= 0 ? args.filter((_, i) => i !== homeAt && i !== homeAt + 1) : args;
+  const dataDir =
+    homeAt >= 0 && args[homeAt + 1]
+      ? (await import('node:path')).resolve(args[homeAt + 1]!)
+      : defaultDataDir();
 
   if (cmd === 'start') {
     const { values } = parseArgs({
       args: rest,
-      options: { port: { type: 'string' }, host: { type: 'string' }, 'no-open': { type: 'boolean' } },
+      options: {
+        port: { type: 'string' },
+        host: { type: 'string' },
+        'no-open': { type: 'boolean' },
+        secrets: { type: 'string' },
+      },
     });
+    if (values.secrets) {
+      if (!['auto', 'database', 'memory'].includes(values.secrets))
+        throw new Error('--secrets must be auto, database or memory');
+      process.env.FARSHELF_KEYCHAIN = values.secrets;
+    }
     const port = Number(values.port ?? process.env.FARSHELF_PORT ?? 7420);
     const host = values.host ?? process.env.FARSHELF_HOST ?? '127.0.0.1';
     const { App } = await import('./app.ts');
@@ -56,12 +75,18 @@ async function main(): Promise<void> {
     const login = `${baseUrl}/login#t=${app.auth.apiToken}`;
     console.log(`Farshelf ${(await import('./app.ts')).VERSION} running at ${baseUrl}`);
     console.log(`Data directory: ${dataDir}`);
-    console.log(`Secrets stored in: ${app.secrets.kind}${app.secrets.secure ? '' : ' (not an OS keychain; encrypted remotes must be unlocked after each restart)'}`);
+    console.log(
+      `Secrets stored in: ${app.secrets.kind}${app.secrets.secure ? '' : ' (not an OS keychain; encrypted remotes must be unlocked after each restart)'}`,
+    );
     if (!['127.0.0.1', 'localhost', '::1'].includes(host)) {
-      console.warn(`WARNING: listening on ${host}. Anyone who can reach this port and has the credentials can read your files. Put it behind TLS.`);
+      console.warn(
+        `WARNING: listening on ${host}. Anyone who can reach this port and has the credentials can read your files. Put it behind TLS.`,
+      );
     }
     console.log(`\nOpen this link to sign in to the UI (keep it private):\n  ${login}\n`);
-    console.log(`Mount in your file manager: ${baseUrl}/dav/  (user: farshelf, password shown in Settings › Mount)`);
+    console.log(
+      `Mount in your file manager: ${baseUrl}/dav/  (user: farshelf, password shown in Settings › Mount)`,
+    );
     if (!values['no-open']) openBrowser(login);
     const shutdown = async () => {
       console.log('\nStopping Farshelf…');
@@ -88,28 +113,42 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'decrypt') {
-    const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { 'recovery-key': { type: 'boolean' } } });
+    const { values, positionals } = parseArgs({
+      args: rest,
+      allowPositionals: true,
+      options: { 'recovery-key': { type: 'boolean' } },
+    });
     const [src, out] = positionals;
     if (!src || !out) {
       console.error('Usage: farshelf decrypt <encrypted-folder> <output-folder>');
       process.exitCode = 1;
       return;
     }
-    const secret = process.env.FARSHELF_PASSPHRASE ?? (await prompt(values['recovery-key'] ? 'Recovery key: ' : 'Passphrase: '));
+    const secret =
+      process.env.FARSHELF_PASSPHRASE ??
+      (await prompt(values['recovery-key'] ? 'Recovery key: ' : 'Passphrase: '));
     const { decryptTree } = await import('./decrypt.ts');
-    const n = await decryptTree(path.resolve(src), path.resolve(out), values['recovery-key'] ? { recoveryKey: secret } : { passphrase: secret });
+    const n = await decryptTree(
+      path.resolve(src),
+      path.resolve(out),
+      values['recovery-key'] ? { recoveryKey: secret } : { passphrase: secret },
+    );
     console.log(`Decrypted ${n} file(s) into ${path.resolve(out)}`);
     return;
   }
 
   if (cmd === 'reset') {
     if (!rest.includes('--yes')) {
-      console.error(`This deletes ${dataDir} (settings, index, queued uploads, stored sign-ins). Re-run with --yes to confirm.`);
+      console.error(
+        `This deletes ${dataDir} (settings, index, queued uploads, stored sign-ins). Re-run with --yes to confirm.`,
+      );
       process.exitCode = 1;
       return;
     }
     await fs.rm(dataDir, { recursive: true, force: true });
-    console.log(`Deleted ${dataDir}. Keychain entries named "Farshelf" can be removed with your keychain app.`);
+    console.log(
+      `Deleted ${dataDir}. Keychain entries named "Farshelf" can be removed with your keychain app.`,
+    );
     return;
   }
 
@@ -119,7 +158,11 @@ async function main(): Promise<void> {
 
 function openBrowser(url: string): void {
   const [cmd, args] =
-    process.platform === 'darwin' ? ['open', [url]] : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]] : ['xdg-open', [url]];
+    process.platform === 'darwin'
+      ? ['open', [url]]
+      : process.platform === 'win32'
+        ? ['cmd', ['/c', 'start', '', url]]
+        : ['xdg-open', [url]];
   const child = spawn(cmd as string, args as string[], { stdio: 'ignore', detached: true });
   child.on('error', () => undefined);
   child.unref();

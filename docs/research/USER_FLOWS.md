@@ -26,6 +26,7 @@ describe what this repository implements.
 ## Farshelf
 
 ### F1. First run (about 1 minute)
+
 1. `npx farshelf` (or `farshelf start`) starts the daemon on
    `127.0.0.1:7420`, then prints and opens a one-time login URL.
 2. The UI shows **onboarding** because no remote exists yet. The default
@@ -38,16 +39,18 @@ describe what this repository implements.
 4. The remote appears in the sidebar and the file browser opens on it.
 
 ### F2. Upload
+
 1. Drag files onto the window, or click **Upload**. Files are copied into
-   the local spool. The UI lists them as *queued* straight away.
+   the local spool. The UI lists them as _queued_ straight away.
 2. The Transfers view shows progress, rate and ETA. You can pause, resume,
    cancel or retry.
-3. If the daemon stops or the network drops, the job goes back to *queued*
+3. If the daemon stops or the network drops, the job goes back to _queued_
    and resumes from the last confirmed offset when possible.
 4. When it finishes, the spool copy is deleted and the activity log records
    the upload.
 
 ### F3. Open / stream
+
 1. Click a file. Media and PDFs open in a new tab through
    `/stream/<remote>/<path>`, which supports HTTP Range. Use **Copy stream
    link** to paste the URL into VLC or IINA.
@@ -55,17 +58,20 @@ describe what this repository implements.
    capped cache.
 
 ### F4. Mount in the file manager
+
 Settings › Mount shows the WebDAV URL and the generated credentials, plus
 platform steps. On macOS there's a **Mount in Finder** button that mounts
 through `osascript`.
 
 ### F5. Search (⌘K)
+
 Type to search file names across indexed remotes. Use the arrow keys to
 move, Return to open, ⌘Return to show the containing folder, and ⌘⇧C to
 copy the stream link. If AI is on, "Ask AI" turns the question into a
 filter, shows it, and runs it locally.
 
 ### F6. AI assistant (optional)
+
 1. Settings › AI: choose Ollama (default URL `http://127.0.0.1:11434`) or
    an OpenAI-compatible endpoint, then click Test.
 2. In the palette, type a request (for example "move all wav files in Music
@@ -77,12 +83,14 @@ filter, shows it, and runs it locally.
    results. Nothing runs without approval.
 
 ### F7. Recover
+
 - **Trash:** restore or permanently delete. Items older than 30 days are
   purged automatically.
 - **Locked encrypted remote after restart** (no keychain): enter the
   passphrase or the recovery key.
 
 ### F8. Leave cleanly
+
 Settings › Remote › Remove deletes the tokens, catalog rows and cached data
 for that remote. Your remote files are not touched.
 `farshelf reset` removes all Farshelf data.

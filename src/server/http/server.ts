@@ -9,7 +9,16 @@ import type { App } from '../app.ts';
 import { appState, handleApi } from './api.ts';
 import { DAV_PREFIX, handleDav } from './dav.ts';
 import { handleStream } from './stream.ts';
-import { basicAuth, handleError, mimeType, parseCookies, readJson, sendJson, type Req, type Res } from './util.ts';
+import {
+  basicAuth,
+  handleError,
+  mimeType,
+  parseCookies,
+  readJson,
+  sendJson,
+  type Req,
+  type Res,
+} from './util.ts';
 
 const COOKIE = 'farshelf_session';
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -41,7 +50,13 @@ export function createServer(app: App, opts: ServerOptions = {}): http.Server {
     const addr = server.address();
     const port = typeof addr === 'object' && addr ? addr.port : 0;
     const extraOriginHosts = (opts.extraOrigins ?? []).map((o) => new URL(o).host);
-    return new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`, ...(opts.extraHosts ?? []), ...extraOriginHosts]);
+    return new Set([
+      `127.0.0.1:${port}`,
+      `localhost:${port}`,
+      `[::1]:${port}`,
+      ...(opts.extraHosts ?? []),
+      ...extraOriginHosts,
+    ]);
   };
 
   async function handle(req: Req, res: Res): Promise<void> {
@@ -64,7 +79,10 @@ export function createServer(app: App, opts: ServerOptions = {}): http.Server {
 
     if (url.pathname === DAV_PREFIX || url.pathname.startsWith(DAV_PREFIX + '/')) {
       if (!hasBasic && !hasSession) {
-        res.writeHead(401, { 'www-authenticate': 'Basic realm="Farshelf", charset="UTF-8"', 'content-length': 0 });
+        res.writeHead(401, {
+          'www-authenticate': 'Basic realm="Farshelf", charset="UTF-8"',
+          'content-length': 0,
+        });
         res.end();
         return;
       }
@@ -88,15 +106,24 @@ export function createServer(app: App, opts: ServerOptions = {}): http.Server {
       if (url.pathname === '/api/session' && req.method === 'POST') {
         const { token } = await readJson(req, z.object({ token: z.string() }));
         if (!app.checkToken(token)) {
-          sendJson(res, 401, { error: 'bad_token', message: 'That login link is not valid. Run `farshelf url` to get a fresh one.' });
+          sendJson(res, 401, {
+            error: 'bad_token',
+            message: 'That login link is not valid. Run `farshelf url` to get a fresh one.',
+          });
           return;
         }
-        res.setHeader('set-cookie', `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`);
+        res.setHeader(
+          'set-cookie',
+          `${COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`,
+        );
         sendJson(res, 200, { ok: true });
         return;
       }
       if (!hasSession) {
-        sendJson(res, 401, { error: 'unauthenticated', message: 'Open the login link printed by `farshelf start` (or run `farshelf url`).' });
+        sendJson(res, 401, {
+          error: 'unauthenticated',
+          message: 'Open the login link printed by `farshelf start` (or run `farshelf url`).',
+        });
         return;
       }
       if (url.pathname === '/api/events') return events(req, res);
@@ -138,17 +165,33 @@ fetch('/api/session', {method:'POST', headers:{'content-type':'application/json'
   }
 
   async function oauthCallback(url: URL, res: Res): Promise<void> {
-    const flow = await app.completeGoogleSignIn(url.searchParams.get('state') ?? '', url.searchParams.get('code'), url.searchParams.get('error'));
+    const flow = await app.completeGoogleSignIn(
+      url.searchParams.get('state') ?? '',
+      url.searchParams.get('code'),
+      url.searchParams.get('error'),
+    );
     const ok = !!flow.result;
-    const msg = ok ? 'Signed in to Google. You can close this tab and return to Farshelf.' : `Google sign-in failed: ${flow.error}`;
-    res.writeHead(ok ? 200 : 400, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'" });
-    res.end(`<!doctype html><meta charset="utf-8"><title>Farshelf</title><body style="font:16px system-ui;margin:4rem auto;max-width:32rem">${msg.replace(/[<>&]/g, '')}</body>`);
+    const msg = ok
+      ? 'Signed in to Google. You can close this tab and return to Farshelf.'
+      : `Google sign-in failed: ${flow.error}`;
+    res.writeHead(ok ? 200 : 400, {
+      'content-type': 'text/html; charset=utf-8',
+      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'",
+    });
+    res.end(
+      `<!doctype html><meta charset="utf-8"><title>Farshelf</title><body style="font:16px system-ui;margin:4rem auto;max-width:32rem">${msg.replace(/[<>&]/g, '')}</body>`,
+    );
   }
 
   function events(req: Req, res: Res): void {
-    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+    res.writeHead(200, {
+      'content-type': 'text/event-stream',
+      'cache-control': 'no-store',
+      connection: 'keep-alive',
+    });
     res.write(': connected\n\n');
-    const send = (type: string) => (data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data ?? {})}\n\n`);
+    const send = (type: string) => (data: unknown) =>
+      res.write(`event: ${type}\ndata: ${JSON.stringify(data ?? {})}\n\n`);
     const handlers: [string, (d: unknown) => void][] = [
       ['job', send('job')],
       ['activity', send('activity')],

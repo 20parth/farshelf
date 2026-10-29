@@ -12,3 +12,4 @@ test-results/
 *.db-shm
 .farshelf-dev/
 .DS_Store
+.claude/

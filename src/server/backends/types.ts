@@ -35,7 +35,12 @@ export interface Backend {
   readonly chunkSize: number;
   abortUpload(state: UploadState): Promise<void>;
   /** Non-resumable backends upload the whole body in one request instead of using chunks. */
-  putStream?(path: string, size: number, body: AsyncIterable<Uint8Array>, signal?: AbortSignal): Promise<void>;
+  putStream?(
+    path: string,
+    size: number,
+    body: AsyncIterable<Uint8Array>,
+    signal?: AbortSignal,
+  ): Promise<void>;
   /** Human-readable location for the UI. */
   describe(): string;
 }

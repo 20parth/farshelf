@@ -3,7 +3,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { finishOAuth, GdriveBackend, startOAuth, type GoogleEndpoints } from '../../src/server/backends/gdrive.ts';
+import {
+  finishOAuth,
+  GdriveBackend,
+  startOAuth,
+  type GoogleEndpoints,
+} from '../../src/server/backends/gdrive.ts';
 import { randomData } from './helpers.ts';
 
 interface MockFile {
@@ -18,7 +23,10 @@ interface MockFile {
 
 const FOLDER = 'application/vnd.google-apps.folder';
 const files = new Map<string, MockFile>();
-const sessions = new Map<string, { fileId: string | null; meta: { name?: string; parents?: string[] }; size: number; received: Buffer }>();
+const sessions = new Map<
+  string,
+  { fileId: string | null; meta: { name?: string; parents?: string[] }; size: number; received: Buffer }
+>();
 const codes = new Map<string, string>(); // code -> challenge
 let server: http.Server;
 let ep: GoogleEndpoints;
@@ -37,7 +45,13 @@ function evalQuery(q: string, f: MockFile): boolean {
   });
 }
 
-const view = (f: MockFile) => ({ id: f.id, name: f.name, mimeType: f.mimeType, size: f.mimeType === FOLDER ? undefined : String(f.data.length), modifiedTime: f.modifiedTime });
+const view = (f: MockFile) => ({
+  id: f.id,
+  name: f.name,
+  mimeType: f.mimeType,
+  size: f.mimeType === FOLDER ? undefined : String(f.data.length),
+  modifiedTime: f.modifiedTime,
+});
 
 async function body(req: http.IncomingMessage): Promise<Buffer> {
   const parts: Buffer[] = [];
@@ -63,7 +77,9 @@ beforeAll(async () => {
         return send(200, { access_token: 'at', refresh_token: 'rt-1', id_token: idToken, expires_in: 3600 });
       }
       tokenRefreshes++;
-      return p.get('refresh_token') === 'rt-1' ? send(200, { access_token: 'at', expires_in: 3600 }) : send(400, { error: 'invalid_grant' });
+      return p.get('refresh_token') === 'rt-1'
+        ? send(200, { access_token: 'at', expires_in: 3600 })
+        : send(400, { error: 'invalid_grant' });
     }
     if (req.headers.authorization !== 'Bearer at') return send(401, { error: 'unauthorized' });
     let m;
@@ -73,7 +89,15 @@ beforeAll(async () => {
     }
     if (url.pathname === '/drive/files' && req.method === 'POST') {
       const meta = JSON.parse(raw.toString());
-      const f: MockFile = { id: randomUUID(), name: meta.name, mimeType: meta.mimeType, parents: meta.parents ?? ['root'], data: Buffer.alloc(0), modifiedTime: new Date().toISOString(), trashed: false };
+      const f: MockFile = {
+        id: randomUUID(),
+        name: meta.name,
+        mimeType: meta.mimeType,
+        parents: meta.parents ?? ['root'],
+        data: Buffer.alloc(0),
+        modifiedTime: new Date().toISOString(),
+        trashed: false,
+      };
       files.set(f.id, f);
       return send(200, view(f));
     }
@@ -106,7 +130,12 @@ beforeAll(async () => {
     if (url.pathname.startsWith('/upload/files') && url.searchParams.get('uploadType') === 'resumable') {
       const sid = randomUUID();
       const fileId = url.pathname.split('/')[3] ?? null;
-      sessions.set(sid, { fileId, meta: JSON.parse(raw.toString() || '{}'), size: Number(req.headers['x-upload-content-length']), received: Buffer.alloc(0) });
+      sessions.set(sid, {
+        fileId,
+        meta: JSON.parse(raw.toString() || '{}'),
+        size: Number(req.headers['x-upload-content-length']),
+        received: Buffer.alloc(0),
+      });
       return send(200, {}, { location: `${ep.uploadBase}/session/${sid}` });
     }
     if ((m = url.pathname.match(/^\/upload\/session\/(.+)$/))) {
@@ -116,7 +145,15 @@ beforeAll(async () => {
       const finish = () => {
         const f: MockFile = s.fileId
           ? files.get(s.fileId)!
-          : { id: randomUUID(), name: s.meta.name!, mimeType: 'application/octet-stream', parents: s.meta.parents!, data: Buffer.alloc(0), modifiedTime: '', trashed: false };
+          : {
+              id: randomUUID(),
+              name: s.meta.name!,
+              mimeType: 'application/octet-stream',
+              parents: s.meta.parents!,
+              data: Buffer.alloc(0),
+              modifiedTime: '',
+              trashed: false,
+            };
         f.data = s.received;
         f.modifiedTime = new Date().toISOString();
         files.set(f.id, f);
@@ -141,14 +178,24 @@ beforeAll(async () => {
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
-  ep = { authUrl: `${base}/auth`, tokenUrl: `${base}/token`, apiBase: `${base}/drive`, uploadBase: `${base}/upload` };
+  ep = {
+    authUrl: `${base}/auth`,
+    tokenUrl: `${base}/token`,
+    apiBase: `${base}/drive`,
+    uploadBase: `${base}/upload`,
+  };
 });
 
 afterAll(() => new Promise<void>((r) => server.close(() => r())));
 
 describe('Google OAuth (PKCE)', () => {
   it('builds a drive.file-only consent URL and exchanges the code with the verifier', async () => {
-    const { flow, authUrl } = startOAuth('client-id-123', undefined, 'http://127.0.0.1:7420/oauth/callback', ep);
+    const { flow, authUrl } = startOAuth(
+      'client-id-123',
+      undefined,
+      'http://127.0.0.1:7420/oauth/callback',
+      ep,
+    );
     const u = new URL(authUrl);
     expect(u.searchParams.get('scope')).toBe('openid email https://www.googleapis.com/auth/drive.file');
     expect(u.searchParams.get('code_challenge_method')).toBe('S256');
@@ -179,7 +226,9 @@ describe('Google Drive backend', () => {
     const state = await d.beginUpload("/Films/it's here.mov", data.length);
     await d.uploadChunk(state, 0, data.subarray(0, d.chunkSize));
     failNextChunk = true;
-    await expect(d.uploadChunk(state, d.chunkSize, data.subarray(d.chunkSize, 2 * d.chunkSize))).rejects.toThrow(/503/);
+    await expect(
+      d.uploadChunk(state, d.chunkSize, data.subarray(d.chunkSize, 2 * d.chunkSize)),
+    ).rejects.toThrow(/503/);
     // A new process would ask the session how far it got.
     const offset = await drive().uploadedOffset(state);
     expect(offset).toBe(d.chunkSize);
@@ -188,7 +237,9 @@ describe('Google Drive backend', () => {
     expect(await d.uploadedOffset(state)).toBe(data.length);
     const st = await d.stat("/Films/it's here.mov");
     expect(st).toMatchObject({ kind: 'file', size: data.length });
-    expect(Buffer.from(await d.read("/Films/it's here.mov", 100, 200)).equals(data.subarray(100, 200))).toBe(true);
+    expect(Buffer.from(await d.read("/Films/it's here.mov", 100, 200)).equals(data.subarray(100, 200))).toBe(
+      true,
+    );
   });
 
   it('replaces an existing file in place, moves, renames and deletes', async () => {

@@ -1,13 +1,29 @@
 // Offline decryption of a local copy of an encrypted remote (e.g. a downloaded Google Drive folder).
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { decryptSegment, HEADER_SIZE, openHeader, plainSize, segmentCount, segmentLocation } from './crypto/format.ts';
+import {
+  decryptSegment,
+  HEADER_SIZE,
+  openHeader,
+  plainSize,
+  segmentCount,
+  segmentLocation,
+} from './crypto/format.ts';
 import { NameCipher, unlockWithPassphrase, unlockWithRecoveryKey, vaultDocSchema } from './crypto/keys.ts';
 import { readFileRange } from './vault.ts';
 
-export async function decryptTree(src: string, out: string, secret: { passphrase: string } | { recoveryKey: string }): Promise<number> {
-  const doc = vaultDocSchema.parse(JSON.parse(await fs.readFile(path.join(src, '.farshelf', 'vault.json'), 'utf8')));
-  const master = 'passphrase' in secret ? await unlockWithPassphrase(doc, secret.passphrase) : unlockWithRecoveryKey(doc, secret.recoveryKey);
+export async function decryptTree(
+  src: string,
+  out: string,
+  secret: { passphrase: string } | { recoveryKey: string },
+): Promise<number> {
+  const doc = vaultDocSchema.parse(
+    JSON.parse(await fs.readFile(path.join(src, '.farshelf', 'vault.json'), 'utf8')),
+  );
+  const master =
+    'passphrase' in secret
+      ? await unlockWithPassphrase(doc, secret.passphrase)
+      : unlockWithRecoveryKey(doc, secret.recoveryKey);
   const names = new NameCipher(master);
   let count = 0;
 
@@ -22,7 +38,8 @@ export async function decryptTree(src: string, out: string, secret: { passphrase
         console.warn(`skipping ${path.join(dir, ent.name)} (not encrypted with this key)`);
         continue;
       }
-      if (name.includes('/') || name === '..' || name === '.') throw new Error('refusing unsafe decrypted name');
+      if (name.includes('/') || name === '..' || name === '.')
+        throw new Error('refusing unsafe decrypted name');
       const from = path.join(dir, ent.name);
       const to = path.join(target, name);
       if (ent.isDirectory()) await walk(from, to);

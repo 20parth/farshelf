@@ -18,7 +18,7 @@ import {
 import { NameCipher, vaultDocSchema, type VaultDoc } from './crypto/keys.ts';
 import { DecryptError } from './crypto/format.ts';
 import { AppError, LockedError, NotFoundError } from './errors.ts';
-import { baseName, joinPath, normPath, parentOf } from './paths.ts';
+import { baseName, isWithin, joinPath, normPath, parentOf } from './paths.ts';
 
 export const BLOCK_SIZE = SEGMENT_SIZE;
 export const META_DIR = '/.farshelf';
@@ -109,8 +109,19 @@ export class Vault {
   remotePath(p: string): string {
     const n = normPath(p);
     if (!this.encrypted || n === '/') return n;
-    const names = this.names ?? (() => { throw new LockedError(this.remoteName); })();
-    return '/' + n.split('/').filter(Boolean).map((s) => names.encrypt(s)).join('/');
+    const names =
+      this.names ??
+      (() => {
+        throw new LockedError(this.remoteName);
+      })();
+    return (
+      '/' +
+      n
+        .split('/')
+        .filter(Boolean)
+        .map((s) => names.encrypt(s))
+        .join('/')
+    );
   }
 
   /** Path inside the trash area: /.farshelf-trash/<id>/<name>, with the name encrypted when needed. */
@@ -135,18 +146,45 @@ export class Vault {
   async list(p: string): Promise<Entry[]> {
     if (this.locked) throw new LockedError(this.remoteName);
     const dir = normPath(p);
-    const raw = await this.backend.list(this.remotePath(dir));
+    const pending = this.pending();
+    const hasPendingBelow = [...pending.keys()].some((k) => isWithin(k, dir) && k !== dir);
+    let raw: RemoteStat[];
+    try {
+      raw = await this.backend.list(this.remotePath(dir));
+    } catch (err) {
+      // A folder that so far only exists in queued uploads.
+      if (err instanceof NotFoundError && hasPendingBelow) raw = [];
+      else throw err;
+    }
     const out = new Map<string, Entry>();
     for (const r of raw) {
       if (dir === '/' && HIDDEN_AT_ROOT.has(r.name)) continue;
       const st = this.decodeStat(r);
       if (!st) continue;
-      out.set(st.name, { name: st.name, path: joinPath(dir, st.name), kind: st.kind, size: st.size, mtime: st.mtime });
+      out.set(st.name, {
+        name: st.name,
+        path: joinPath(dir, st.name),
+        kind: st.kind,
+        size: st.size,
+        mtime: st.mtime,
+      });
     }
-    for (const [path, pf] of this.pending()) {
-      if (parentOf(path) !== dir) continue;
-      const name = baseName(path);
-      out.set(name, { name, path, kind: 'file', size: pf.size, mtime: pf.mtime, pending: true });
+    for (const [path, pf] of pending) {
+      if (parentOf(path) === dir) {
+        const name = baseName(path);
+        out.set(name, { name, path, kind: 'file', size: pf.size, mtime: pf.mtime, pending: true });
+      } else if (isWithin(path, dir)) {
+        const name = path.slice(dir === '/' ? 1 : dir.length + 1).split('/')[0]!;
+        if (!out.has(name))
+          out.set(name, {
+            name,
+            path: joinPath(dir, name),
+            kind: 'dir',
+            size: 0,
+            mtime: pf.mtime,
+            pending: true,
+          });
+      }
     }
     return [...out.values()];
   }
@@ -174,7 +212,8 @@ export class Vault {
   /** Forget cached metadata and blocks for a path (and everything under it). */
   invalidate(p: string): void {
     const n = normPath(p);
-    for (const k of [...this.statCache.keys()]) if (k === n || k.startsWith(n + '/') || n === '/') this.statCache.delete(k);
+    for (const k of [...this.statCache.keys()])
+      if (k === n || k.startsWith(n + '/') || n === '/') this.statCache.delete(k);
     for (const k of [...this.headers.keys()]) if (k === n || k.startsWith(n + '/')) this.headers.delete(k);
     this.cache.invalidate(`${this.remoteId}:${n}`);
   }
@@ -280,10 +319,15 @@ export class Vault {
   }
 
   /** Return a function producing stored bytes [start,end) of the upload, encrypting deterministically if needed. */
-  uploadReader(spoolPath: string, size: number, header: Buffer | null): (start: number, end: number) => Promise<Uint8Array> {
+  uploadReader(
+    spoolPath: string,
+    size: number,
+    header: Buffer | null,
+  ): (start: number, end: number) => Promise<Uint8Array> {
     if (!this.encrypted) return (start, end) => readFileRange(spoolPath, start, Math.min(end, size));
     const fc = openHeader(this.getMasterKey(), header!);
-    return (start, end) => ciphertextRange(fc, size, start, end, (o, l) => readFileRange(spoolPath, o, o + l));
+    return (start, end) =>
+      ciphertextRange(fc, size, start, end, (o, l) => readFileRange(spoolPath, o, o + l));
   }
 }
 
@@ -306,7 +350,13 @@ export async function readFileRange(file: string, start: number, end: number): P
 /** Upload a small in-memory object using whichever upload style the backend supports. */
 export async function writeSmall(backend: Backend, path: string, data: Buffer): Promise<void> {
   if (backend.putStream) {
-    await backend.putStream(path, data.length, (async function* () { yield data; })());
+    await backend.putStream(
+      path,
+      data.length,
+      (async function* () {
+        yield data;
+      })(),
+    );
     return;
   }
   const state = await backend.beginUpload(path, data.length);

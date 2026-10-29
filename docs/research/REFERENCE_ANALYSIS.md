@@ -14,7 +14,7 @@ homepage. The `/terms` page was not reviewed in detail.
 - We did not copy any text, artwork, branding or code. The site states that
   the product, its design, copy and code are © 2026 feather drive, all
   rights reserved. Farshelf is an independent implementation of the same
-  *problem space* (mounting your existing cloud storage on the desktop
+  _problem space_ (mounting your existing cloud storage on the desktop
   without local copies). Products such as rclone already work in that space.
 
 Everything in "verified" below is verified **as a public claim on the
@@ -22,16 +22,16 @@ website**, not as tested behaviour of the app.
 
 ## Product identity
 
-| Item | Finding |
-| --- | --- |
-| Name | feather drive (stylised lowercase) |
-| Platform | Native macOS app, macOS 26 "Tahoe" or later. Mac only. |
-| Category | Desktop file-system integration for cloud storage ("your cloud, as an infinite mac disk") |
-| Storage backends | Google Drive and Dropbox ("more coming") |
-| Business model | 3-day trial, then a one-time US$19.99 licence (up to 3 Macs, free 1.x updates). After the trial, existing files stay readable but you can't add new ones. Payments go through Razorpay. |
-| Author | One independent developer ("sumit") |
-| Version | 1.0, first public release |
-| Web app | The privacy and security pages mention a web app that can unlock encrypted files. It was not found or examined. |
+| Item             | Finding                                                                                                                                                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name             | feather drive (stylised lowercase)                                                                                                                                                      |
+| Platform         | Native macOS app, macOS 26 "Tahoe" or later. Mac only.                                                                                                                                  |
+| Category         | Desktop file-system integration for cloud storage ("your cloud, as an infinite mac disk")                                                                                               |
+| Storage backends | Google Drive and Dropbox ("more coming")                                                                                                                                                |
+| Business model   | 3-day trial, then a one-time US$19.99 licence (up to 3 Macs, free 1.x updates). After the trial, existing files stay readable but you can't add new ones. Payments go through Razorpay. |
+| Author           | One independent developer ("sumit")                                                                                                                                                     |
+| Version          | 1.0, first public release                                                                                                                                                               |
+| Web app          | The privacy and security pages mention a web app that can unlock encrypted files. It was not found or examined.                                                                         |
 
 ## Core concept
 
@@ -108,13 +108,13 @@ feather drive's file format, which we have not seen.
 
 ## Gaps and weaknesses (opportunities)
 
-| Gap | Why it matters |
-| --- | --- |
-| Mac only, macOS 26+ only | Excludes Linux, Windows and older Macs |
-| Closed source, paid | Users can't audit the crypto or self-host |
-| Default-on telemetry | A privacy-conscious audience may object |
-| Only Google Drive and Dropbox | No self-hosted backends (WebDAV/Nextcloud, NAS, S3) |
-| No headless/server mode | Teams can't run it on a home server or NAS |
-| No published file-format spec | Users depend on the vendor for long-term decryptability |
-| No upload history or search across past activity was mentioned | Hard to audit what happened |
-| Search is filename-only (as far as described) | No natural-language or attribute queries ("videos over 10 GB from last month") |
+| Gap                                                            | Why it matters                                                                 |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Mac only, macOS 26+ only                                       | Excludes Linux, Windows and older Macs                                         |
+| Closed source, paid                                            | Users can't audit the crypto or self-host                                      |
+| Default-on telemetry                                           | A privacy-conscious audience may object                                        |
+| Only Google Drive and Dropbox                                  | No self-hosted backends (WebDAV/Nextcloud, NAS, S3)                            |
+| No headless/server mode                                        | Teams can't run it on a home server or NAS                                     |
+| No published file-format spec                                  | Users depend on the vendor for long-term decryptability                        |
+| No upload history or search across past activity was mentioned | Hard to audit what happened                                                    |
+| Search is filename-only (as far as described)                  | No natural-language or attribute queries ("videos over 10 GB from last month") |

@@ -6,7 +6,8 @@ export function defaultDataDir(env: NodeJS.ProcessEnv = process.env): string {
   if (env.FARSHELF_HOME) return path.resolve(env.FARSHELF_HOME);
   const home = os.homedir();
   if (process.platform === 'darwin') return path.join(home, 'Library', 'Application Support', 'Farshelf');
-  if (process.platform === 'win32') return path.join(env.APPDATA ?? path.join(home, 'AppData', 'Roaming'), 'Farshelf');
+  if (process.platform === 'win32')
+    return path.join(env.APPDATA ?? path.join(home, 'AppData', 'Roaming'), 'Farshelf');
   return path.join(env.XDG_DATA_HOME ?? path.join(home, '.local', 'share'), 'farshelf');
 }
 

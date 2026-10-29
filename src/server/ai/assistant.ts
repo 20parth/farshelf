@@ -1,6 +1,12 @@
 // Optional AI features. The model only ever proposes; Farshelf validates, and the user approves before anything runs.
 import { z } from 'zod';
-import { aiPlan, searchFilter, type AiPlan, type AiSettings, type SearchFilter } from '../../shared/schemas.ts';
+import {
+  aiPlan,
+  searchFilter,
+  type AiPlan,
+  type AiSettings,
+  type SearchFilter,
+} from '../../shared/schemas.ts';
 import { AppError } from '../errors.ts';
 import { isWithin, normPath } from '../paths.ts';
 
@@ -15,8 +21,13 @@ export interface Provider {
 }
 
 function unreachable(s: AiSettings, err: unknown): AppError {
-  const hint = s.provider === 'ollama' ? ' Is Ollama running (`ollama serve`) and is the model pulled (`ollama pull <model>`)?' : '';
-  return new AppError(503, 'ai_unavailable', `Cannot reach the AI provider at ${s.baseUrl}.${hint}`, { cause: err });
+  const hint =
+    s.provider === 'ollama'
+      ? ' Is Ollama running (`ollama serve`) and is the model pulled (`ollama pull <model>`)?'
+      : '';
+  return new AppError(503, 'ai_unavailable', `Cannot reach the AI provider at ${s.baseUrl}.${hint}`, {
+    cause: err,
+  });
 }
 
 async function call(s: AiSettings, url: string, init: RequestInit): Promise<unknown> {
@@ -24,7 +35,8 @@ async function call(s: AiSettings, url: string, init: RequestInit): Promise<unkn
   try {
     res = await fetch(url, { ...init, signal: init.signal ?? AbortSignal.timeout(s.timeoutMs) });
   } catch (err) {
-    if ((err as Error).name === 'TimeoutError') throw new AppError(504, 'ai_timeout', `The AI provider did not answer within ${s.timeoutMs / 1000}s`);
+    if ((err as Error).name === 'TimeoutError')
+      throw new AppError(504, 'ai_timeout', `The AI provider did not answer within ${s.timeoutMs / 1000}s`);
     throw unreachable(s, err);
   }
   const text = await res.text();
@@ -47,7 +59,13 @@ export function makeProvider(s: AiSettings, apiKey: string | null): Provider {
         const json = (await call(s, `${base}/api/chat`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ model: s.model, messages, stream: false, format: 'json', options: { temperature: 0 } }),
+          body: JSON.stringify({
+            model: s.model,
+            messages,
+            stream: false,
+            format: 'json',
+            options: { temperature: 0 },
+          }),
           signal,
         })) as { message?: { content?: string } };
         return json.message?.content ?? '';
@@ -58,13 +76,21 @@ export function makeProvider(s: AiSettings, apiKey: string | null): Provider {
       },
     };
   }
-  const headers: Record<string, string> = { 'content-type': 'application/json', ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}) };
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+  };
   return {
     async chat(messages, signal) {
       const json = (await call(s, `${base}/chat/completions`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ model: s.model, messages, temperature: 0, response_format: { type: 'json_object' } }),
+        body: JSON.stringify({
+          model: s.model,
+          messages,
+          temperature: 0,
+          response_format: { type: 'json_object' },
+        }),
         signal,
       })) as { choices?: { message?: { content?: string } }[] };
       return json.choices?.[0]?.message?.content ?? '';
@@ -82,17 +108,30 @@ export function extractJson(text: string): unknown {
   const body = fenced?.[1] ?? text;
   const start = body.indexOf('{');
   const end = body.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new AppError(502, 'ai_invalid', 'The model did not return JSON. Try again or choose a different model.');
+  if (start < 0 || end <= start)
+    throw new AppError(
+      502,
+      'ai_invalid',
+      'The model did not return JSON. Try again or choose a different model.',
+    );
   try {
     return JSON.parse(body.slice(start, end + 1));
   } catch {
-    throw new AppError(502, 'ai_invalid', 'The model returned malformed JSON. Try again or choose a different model.');
+    throw new AppError(
+      502,
+      'ai_invalid',
+      'The model returned malformed JSON. Try again or choose a different model.',
+    );
   }
 }
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export async function aiSearchFilter(provider: Provider, question: string, signal?: AbortSignal): Promise<SearchFilter> {
+export async function aiSearchFilter(
+  provider: Provider,
+  question: string,
+  signal?: AbortSignal,
+): Promise<SearchFilter> {
   const system = `You turn a request to find files into a JSON search filter. Today is ${today()}.
 Reply with ONLY a JSON object. Allowed keys (all optional):
 - "text": words that must appear in the file name (omit generic words like "files", "my", "all")
@@ -113,7 +152,11 @@ Example: "videos bigger than 10 gb from this year" -> {"category":"video","minSi
   );
   const parsed = searchFilter.omit({ remoteId: true, pathPrefix: true }).safeParse(extractJson(raw));
   if (!parsed.success) {
-    throw new AppError(502, 'ai_invalid', `The model's filter was not valid: ${z.prettifyError(parsed.error).slice(0, 300)}`);
+    throw new AppError(
+      502,
+      'ai_invalid',
+      `The model's filter was not valid: ${z.prettifyError(parsed.error).slice(0, 300)}`,
+    );
   }
   return searchFilter.parse(parsed.data);
 }
@@ -123,7 +166,12 @@ export interface PlanContext {
   entries: { name: string; kind: string; size: number; modified: string }[] | null;
 }
 
-export async function aiPlanSteps(provider: Provider, request: string, ctx: PlanContext, signal?: AbortSignal): Promise<AiPlan> {
+export async function aiPlanSteps(
+  provider: Provider,
+  request: string,
+  ctx: PlanContext,
+  signal?: AbortSignal,
+): Promise<AiPlan> {
   const system = `You help organise files in a storage drive. You can only PROPOSE operations; a human reviews each one.
 Available tools:
 - {"tool":"mkdir","path":"/abs/path","reason":"..."} create a folder
@@ -146,13 +194,21 @@ Reply with ONLY a JSON object: {"summary":"one or two sentences","steps":[...]}`
   );
   const parsed = aiPlan.safeParse(extractJson(raw));
   if (!parsed.success) {
-    throw new AppError(502, 'ai_invalid', `The model's plan was not valid: ${z.prettifyError(parsed.error).slice(0, 300)}`);
+    throw new AppError(
+      502,
+      'ai_invalid',
+      `The model's plan was not valid: ${z.prettifyError(parsed.error).slice(0, 300)}`,
+    );
   }
   for (const step of parsed.data.steps) {
     for (const p of step.tool === 'move' ? [step.from, step.to] : [step.path]) {
       const n = normPath(p);
       if (n === '/' || isWithin(n, '/.farshelf') || n.split('/')[1]?.startsWith('.farshelf')) {
-        throw new AppError(502, 'ai_invalid', `The model proposed a forbidden path (${p}); the plan was rejected.`);
+        throw new AppError(
+          502,
+          'ai_invalid',
+          `The model proposed a forbidden path (${p}); the plan was rejected.`,
+        );
       }
     }
   }

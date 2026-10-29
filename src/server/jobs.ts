@@ -85,7 +85,9 @@ export class JobQueue extends EventEmitter {
 
   /** Called once at start-up: anything that was running when the process died is re-queued. */
   recover(): number {
-    const r = this.db.prepare(`update jobs set state = 'queued', updated_at = ? where state = 'running'`).run(Date.now());
+    const r = this.db
+      .prepare(`update jobs set state = 'queued', updated_at = ? where state = 'running'`)
+      .run(Date.now());
     return Number(r.changes);
   }
 
@@ -107,7 +109,14 @@ export class JobQueue extends EventEmitter {
     this.running.clear();
   }
 
-  create(kind: JobKind, remoteId: string, label: string, path: string, payload: Record<string, unknown>, total = 0): JobInfo {
+  create(
+    kind: JobKind,
+    remoteId: string,
+    label: string,
+    path: string,
+    payload: Record<string, unknown>,
+    total = 0,
+  ): JobInfo {
     const now = Date.now();
     const id = randomUUID();
     this.db
@@ -155,18 +164,31 @@ export class JobQueue extends EventEmitter {
   }
 
   list(filter: { remoteId?: string; states?: JobState[] } = {}): JobInfo[] {
-    const rows = this.db.prepare('select * from jobs order by created_at desc limit 500').all() as unknown as Row[];
+    const rows = this.db
+      .prepare('select * from jobs order by created_at desc limit 500')
+      .all() as unknown as Row[];
     return rows
-      .filter((r) => (!filter.remoteId || r.remote_id === filter.remoteId) && (!filter.states || filter.states.includes(r.state)))
+      .filter(
+        (r) =>
+          (!filter.remoteId || r.remote_id === filter.remoteId) &&
+          (!filter.states || filter.states.includes(r.state)),
+      )
       .map((r) => this.toInfo(r));
   }
 
-  private setState(id: string, to: JobState, patch: { error?: string | null; attempts?: number; nextRunAt?: number }): JobInfo {
+  private setState(
+    id: string,
+    to: JobState,
+    patch: { error?: string | null; attempts?: number; nextRunAt?: number },
+  ): JobInfo {
     const r = this.row(id);
     if (!r) throw new NotFoundError('job');
-    if (!canTransition(r.state, to)) throw new AppError(409, 'bad_transition', `cannot move a ${r.state} job to ${to}`);
+    if (!canTransition(r.state, to))
+      throw new AppError(409, 'bad_transition', `cannot move a ${r.state} job to ${to}`);
     this.db
-      .prepare('update jobs set state = ?, error = ?, attempts = ?, next_run_at = ?, updated_at = ? where id = ?')
+      .prepare(
+        'update jobs set state = ?, error = ?, attempts = ?, next_run_at = ?, updated_at = ? where id = ?',
+      )
       .run(
         to,
         patch.error === undefined ? r.error : patch.error,
@@ -266,15 +288,21 @@ export class JobQueue extends EventEmitter {
       payload: this.payload(job.id),
       savePayload: (p) => {
         ctx.payload = p;
-        this.db.prepare('update jobs set payload = ?, updated_at = ? where id = ?').run(JSON.stringify(p), Date.now(), job.id);
+        this.db
+          .prepare('update jobs set payload = ?, updated_at = ? where id = ?')
+          .run(JSON.stringify(p), Date.now(), job.id);
       },
       progress: (done, total) => {
         if (controller.signal.aborted) return;
         const now = Date.now();
         run.samples.push({ t: now, b: done });
         while (run.samples.length > 2 && now - run.samples[0]!.t > 5000) run.samples.shift();
-        if (total !== undefined) this.db.prepare('update jobs set progress = ?, total = ?, updated_at = ? where id = ?').run(done, total, now, job.id);
-        else this.db.prepare('update jobs set progress = ?, updated_at = ? where id = ?').run(done, now, job.id);
+        if (total !== undefined)
+          this.db
+            .prepare('update jobs set progress = ?, total = ?, updated_at = ? where id = ?')
+            .run(done, total, now, job.id);
+        else
+          this.db.prepare('update jobs set progress = ?, updated_at = ? where id = ?').run(done, now, job.id);
         if (now - (this.lastEmit.get(job.id) ?? 0) > 250) {
           this.lastEmit.set(job.id, now);
           this.emit('job', this.get(job.id));
