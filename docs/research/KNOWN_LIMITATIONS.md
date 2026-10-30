@@ -29,8 +29,8 @@
 
 - **Google Drive** is implemented against the public v3 API and tested
   against a local mock. It has **not been tested against live Google
-  servers** in this repository's CI. You must create your own OAuth client
-  ID (Desktop app type). Google desktop clients also come with a "client
+  servers** in this repository's CI. One-click sign-in needs the publisher to
+  register and publish one OAuth client; builds without it ask for your own. Google desktop clients also come with a "client
   secret" that Google documents as not confidential for installed apps.
 - **Dropbox is not implemented.**
 - WebDAV uploads can't resume mid-file. A failed WebDAV upload restarts

@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { App } from '../../src/web/components/App.tsx';
 import { PlanReview } from '../../src/web/components/Palette.tsx';
 import { Unlock } from '../../src/web/components/Unlock.tsx';
@@ -94,6 +94,46 @@ describe('App shell', () => {
     expect(rows[2]).toHaveFocus();
     await user.keyboard('{ArrowUp}{Enter}');
     expect(await screen.findByText('This folder is empty')).toBeInTheDocument();
+  });
+});
+
+describe('Google sign-in', () => {
+  it('is one button for end users when a built-in client exists, and adds the storage after sign-in', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    let remotes: unknown[] = [];
+    const calls = mockFetch({
+      'GET /api/state': () => baseState({ remotes: remotes as never, googleSignIn: 'builtin' }),
+      'GET /api/jobs': () => ({ jobs: [] }),
+      'POST /api/oauth/google/start': () => ({ flowId: 'f1', authUrl: 'https://accounts.example/auth' }),
+      'GET /api/oauth/google/f1': () => ({ done: true, ok: true, email: 'me@example.com', error: null }),
+      'GET /api/remotes/g1/list': () => ({ entries: [] }),
+      'POST /api/remotes': () => {
+        const r = {
+          id: 'g1',
+          name: 'Google Drive',
+          kind: 'gdrive',
+          encrypted: false,
+          locked: false,
+          createdAt: 0,
+          summary: 'Google Drive › Farshelf',
+        };
+        remotes = [r];
+        return { remote: r, recoveryKey: null };
+      },
+    });
+    withStore(<App />);
+    expect(await screen.findByRole('radio', { name: /Google Drive/ })).toBeChecked();
+    expect(screen.getByLabelText('OAuth client ID (optional)')).not.toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Sign in with Google/ }));
+    expect(open).toHaveBeenCalledWith('https://accounts.example/auth', '_blank', 'noopener');
+    expect(
+      await screen.findByRole('region', { name: 'Files in Google Drive' }, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    const create = calls.find((c) => c.method === 'POST' && c.path === '/api/remotes');
+    expect(create?.body).toMatchObject({ kind: 'gdrive', config: { flowId: 'f1', folderName: 'Farshelf' } });
+    const start = calls.find((c) => c.path === '/api/oauth/google/start');
+    expect(start?.body).toEqual({});
   });
 });
 

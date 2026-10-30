@@ -36,6 +36,7 @@ export function baseState(over: Partial<AppState> = {}): AppState {
     cache: { bytes: 0, limit: 1, entries: 0 },
     platform: 'linux',
     keychain: 'memory',
+    googleSignIn: 'own-client',
     ...over,
   };
 }

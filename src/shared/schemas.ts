@@ -199,4 +199,6 @@ export interface AppState {
   cache: { bytes: number; limit: number; entries: number };
   platform: string;
   keychain: string;
+  /** 'builtin': one-click Google sign-in is available; 'own-client': the user must supply an OAuth client. */
+  googleSignIn: 'builtin' | 'own-client';
 }

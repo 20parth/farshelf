@@ -13,3 +13,6 @@ test-results/
 .farshelf-dev/
 .DS_Store
 .claude/
+
+# Publisher Google OAuth client (written by the release workflow from repository secrets)
+google-oauth.json

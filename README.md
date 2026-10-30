@@ -111,12 +111,12 @@ every setting.
 
 ## Storage backends
 
-| Backend            | Streaming  | Resumable uploads  | Notes                                                                                                                                 |
-| ------------------ | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Local folder       | ✅         | ✅                 | External disks, NAS mounts, a folder another sync client manages                                                                      |
-| WebDAV / Nextcloud | ✅ (Range) | ❌ restarts from 0 | Any RFC 4918 server                                                                                                                   |
-| Google Drive       | ✅ (Range) | ✅ native sessions | `drive.file` scope: sees only files Farshelf created. **Bring your own OAuth client**: [setup](docs/AI_AND_PROVIDERS.md#google-drive) |
-| Dropbox            | —          | —                  | Not implemented yet ([roadmap](docs/ROADMAP.md))                                                                                      |
+| Backend            | Streaming  | Resumable uploads  | Notes                                                                                                                                                                                                                                                      |
+| ------------------ | ---------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local folder       | ✅         | ✅                 | External disks, NAS mounts, a folder another sync client manages                                                                                                                                                                                           |
+| WebDAV / Nextcloud | ✅ (Range) | ❌ restarts from 0 | Any RFC 4918 server                                                                                                                                                                                                                                        |
+| Google Drive       | ✅ (Range) | ✅ native sessions | One-click “Sign in with Google” where a client is configured ([publisher setup](docs/AI_AND_PROVIDERS.md#for-publishers-set-up-the-built-in-sign-in-once)), otherwise your own client under Advanced. `drive.file` scope: sees only files Farshelf created |
+| Dropbox            | —          | —                  | Not implemented yet ([roadmap](docs/ROADMAP.md))                                                                                                                                                                                                           |
 
 Google Drive and Nextcloud storage is billed by those providers under their own plans.
 Farshelf never charges anything.

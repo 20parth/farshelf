@@ -2,6 +2,10 @@
 
 ## 0.1.0 (unreleased)
 
+- One-click “Sign in with Google” when the build includes a publisher OAuth client
+  (`google-oauth.json` or env vars; public releases never embed the secret). Your own client is still
+  available under Advanced.
+
 First public version.
 
 - Daemon with web UI. Storage backends: local folder, WebDAV/Nextcloud, and Google
