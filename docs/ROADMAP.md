@@ -4,8 +4,9 @@ Priorities, not promises. Contributions are welcome on any of these.
 
 ## Next
 
-1. **Desktop shell (Tauri 2):** tray icon, drop-on-tray uploads, global search hotkey,
-   start at login. It wraps the existing daemon and UI.
+1. **Desktop shell features:** the macOS app already has a native window and Dock
+   icon. Still to do: a menu-bar icon, drop-on-icon uploads, a global search hotkey,
+   start at login, and Windows/Linux equivalents.
 2. **Dropbox backend** (app-folder scope, upload sessions).
 3. **Native on-demand mount:** a macOS FSKit/File Provider extension, or FUSE/NFS on
    Linux, so file managers read only the ranges apps need.

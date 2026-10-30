@@ -8,7 +8,8 @@
     "farshelf": "dist/server/server/cli.js"
   },
   "files": [
-    "dist",
+    "dist/server",
+    "dist/web",
     "README.md",
     "LICENSE",
     "docs/FORMAT.md"

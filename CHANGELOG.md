@@ -2,7 +2,8 @@
 
 ## 0.1.0 (unreleased)
 
-- `npm run package:mac` builds a self-contained `Farshelf.app` with its own icon. Added
+- `npm run package:mac` builds a self-contained native `Farshelf.app` (Swift + WKWebView
+  window, Dock icon, menus) with its own icon. Added
   **Quit Farshelf** in Settings, and `farshelf url --open`.
 - One-click “Sign in with Google” when the build includes a publisher OAuth client
   (`google-oauth.json` or env vars; public releases never embed the secret). Your own client is still

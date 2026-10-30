@@ -83,19 +83,25 @@ it shows you.
 ### macOS app (double-click, no Node needed)
 
 ```bash
-npm run package:mac      # builds dist/macos/Farshelf.app with its own icon and a bundled Node.js
+npm run package:mac      # builds dist/macos/Farshelf.app
 ```
 
-Drag `Farshelf.app` to Applications and open it. Farshelf starts in the background and
-opens its window in your browser. Opening the app again while it runs just reopens the
-window. Quit it from **Settings › Farshelf app › Quit Farshelf**. Logs go to
-`~/Library/Logs/Farshelf.log`.
+The result is a native app with its own window, Dock icon and menus (a small Swift
+shell around the web UI). It bundles Node.js and starts the Farshelf service by itself.
+Drag it to Applications and open it.
 
-The app is ad-hoc signed, so it runs on the Mac that built it. Giving it to other people
-needs an Apple Developer ID signature and notarization (see
-[docs/RELEASING.md](docs/RELEASING.md)). Otherwise macOS warns that the developer cannot
-be verified. It is a background app with no Dock icon or menu bar yet; a native shell is
-on the [roadmap](docs/ROADMAP.md).
+- Closing the window keeps Farshelf running, so uploads continue. Click the Dock icon
+  to bring the window back.
+- **⌘Q** (or Settings › Farshelf app › Quit) stops it. Interrupted uploads resume at
+  the next launch.
+- Files you open, stream links and Google sign-in open in your default browser or
+  player.
+- Logs go to `~/Library/Logs/Farshelf.log`.
+
+Building the window needs `swiftc` (Xcode or the Command Line Tools). Without it, the
+script builds a background launcher that opens the UI in your browser. The app is
+ad-hoc signed, so it runs on the Mac that built it. Giving it to other people needs an
+Apple Developer ID signature and notarization (see [docs/RELEASING.md](docs/RELEASING.md)).
 
 ### Mount it in your file manager
 
@@ -173,7 +179,7 @@ see [SECURITY.md](SECURITY.md).
 - **Finder and some other WebDAV clients copy a whole file locally when it is
   opened.** For true streaming of big media, open files from the Farshelf UI or use a
   stream link. A native FSKit/FUSE front end is on the roadmap.
-- No tray icon, global hotkey or autostart yet. These need the planned desktop shell.
+- No menu-bar icon, global hotkey or autostart yet.
 - No public share links yet. Dropbox is not supported.
 - Google Drive support is tested against a mock of the API, not against live Google
   servers.

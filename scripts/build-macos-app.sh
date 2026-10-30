@@ -52,6 +52,34 @@ for size in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Farshelf.icns"
 
+# Native window app (Swift + WKWebView) when swiftc is available (Xcode or Command Line Tools);
+# otherwise fall back to a background launcher that opens the UI in the browser.
+if command -v swiftc >/dev/null 2>&1; then
+  echo "› Compiling the native app shell"
+  swiftc -O -swift-version 5 -target "$ARCH-apple-macos12" -framework Cocoa -framework WebKit \
+    "$ROOT/mac/FarshelfApp.swift" -o "$APP/Contents/MacOS/Farshelf"
+  UI_ELEMENT="<false/>"
+else
+  echo "  swiftc not found: building the browser-based launcher instead"
+  cat > "$APP/Contents/MacOS/Farshelf" <<'LAUNCHER'
+#!/bin/bash
+# Farshelf launcher: start the daemon (or, if it is already running, just open its window in the browser).
+RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
+NODE="$RES/node"
+CLI="$RES/node_modules/farshelf/dist/server/server/cli.js"
+LOG="$HOME/Library/Logs/Farshelf.log"
+PORT="${FARSHELF_PORT:-7420}"
+if /usr/sbin/lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  exec "$NODE" "$CLI" url --open
+fi
+mkdir -p "$(dirname "$LOG")"
+echo "=== Farshelf started $(date) ===" >>"$LOG"
+"$NODE" "$CLI" start --port "$PORT" >>"$LOG" 2>&1 &
+LAUNCHER
+  chmod 755 "$APP/Contents/MacOS/Farshelf"
+  UI_ELEMENT="<true/>"
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -66,29 +94,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>Farshelf</string>
   <key>CFBundleIconFile</key><string>Farshelf</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
-  <!-- Background app: the UI opens in your browser; quit from Settings › Farshelf app. -->
-  <key>LSUIElement</key><true/>
+  <key>LSUIElement</key>$UI_ELEMENT
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsLocalNetworking</key><true/></dict>
   <key>NSHumanReadableCopyright</key><string>Apache-2.0 · The Farshelf contributors</string>
 </dict>
 </plist>
 PLIST
-
-cat > "$APP/Contents/MacOS/Farshelf" <<'LAUNCHER'
-#!/bin/bash
-# Farshelf launcher: start the daemon (or, if it is already running, just open its window in the browser).
-RES="$(cd "$(dirname "$0")/../Resources" && pwd)"
-NODE="$RES/node"
-CLI="$RES/node_modules/farshelf/dist/server/server/cli.js"
-LOG="$HOME/Library/Logs/Farshelf.log"
-PORT="${FARSHELF_PORT:-7420}"
-if /usr/sbin/lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  exec "$NODE" "$CLI" url --open
-fi
-mkdir -p "$(dirname "$LOG")"
-echo "=== Farshelf started $(date) ===" >>"$LOG"
-exec "$NODE" "$CLI" start --port "$PORT" >>"$LOG" 2>&1
-LAUNCHER
-chmod 755 "$APP/Contents/MacOS/Farshelf"
 
 # Ad-hoc signature so macOS runs the bundle locally. Sharing it with others needs a Developer ID
 # signature and notarization (see docs/RELEASING.md).
