@@ -9,7 +9,7 @@ import {
   startOAuth,
   type GoogleEndpoints,
 } from '../../src/server/backends/gdrive.ts';
-import { randomData } from './helpers.ts';
+import { makeApp, randomData } from './helpers.ts';
 
 interface MockFile {
   id: string;
@@ -32,6 +32,8 @@ let server: http.Server;
 let ep: GoogleEndpoints;
 let failNextChunk = false;
 let tokenRefreshes = 0;
+let grantedScope = 'openid email https://www.googleapis.com/auth/drive.file';
+let driveInsufficient = false;
 
 function evalQuery(q: string, f: MockFile): boolean {
   const unq = (s: string) => s.replace(/\\'/g, "'").replace(/\\\\/g, '\\');
@@ -74,7 +76,13 @@ beforeAll(async () => {
         const ok = challenge === createHash('sha256').update(p.get('code_verifier')!).digest('base64url');
         if (!ok) return send(400, { error: 'invalid_grant' });
         const idToken = `x.${Buffer.from(JSON.stringify({ email: 'me@example.com' })).toString('base64url')}.y`;
-        return send(200, { access_token: 'at', refresh_token: 'rt-1', id_token: idToken, expires_in: 3600 });
+        return send(200, {
+          access_token: 'at',
+          refresh_token: 'rt-1',
+          id_token: idToken,
+          expires_in: 3600,
+          scope: grantedScope,
+        });
       }
       tokenRefreshes++;
       return p.get('refresh_token') === 'rt-1'
@@ -83,6 +91,15 @@ beforeAll(async () => {
     }
     if (req.headers.authorization !== 'Bearer at') return send(401, { error: 'unauthorized' });
     let m;
+    if (driveInsufficient && url.pathname.startsWith('/drive/')) {
+      return send(403, {
+        error: {
+          code: 403,
+          message: 'Request had insufficient authentication scopes.',
+          errors: [{ reason: 'insufficientPermissions' }],
+        },
+      });
+    }
     if (url.pathname === '/drive/files' && req.method === 'GET') {
       const q = url.searchParams.get('q')!.replace("'root' in parents", "'root' in parents");
       return send(200, { files: [...files.values()].filter((f) => evalQuery(q, f)).map(view) });
@@ -269,5 +286,53 @@ describe('Google Drive backend', () => {
     const d = new GdriveBackend({ clientId: 'c', refreshToken: 'revoked' }, 'Farshelf', ep);
     await expect(d.list('/')).rejects.toThrow(/refused the stored sign-in/);
     expect(tokenRefreshes).toBeGreaterThan(0);
+  });
+});
+
+describe('Google sign-in problems users hit', () => {
+  it('explains when the Drive box was left unticked on the consent screen', async () => {
+    const { flow, authUrl } = startOAuth(
+      'client-id-123',
+      undefined,
+      'http://127.0.0.1:7420/oauth/callback',
+      ep,
+    );
+    codes.set('code-2', new URL(authUrl).searchParams.get('code_challenge')!);
+    grantedScope = 'openid email';
+    try {
+      await expect(finishOAuth(flow, 'code-2', ep)).rejects.toThrow(/tick the box/);
+    } finally {
+      grantedScope = 'openid email https://www.googleapis.com/auth/drive.file';
+    }
+  });
+
+  it('turns a Drive 403 for missing scopes into a clear message', async () => {
+    driveInsufficient = true;
+    try {
+      const d = new GdriveBackend({ clientId: 'c', refreshToken: 'rt-1' }, 'Other', ep);
+      await expect(d.list('/')).rejects.toThrow(/did not give Farshelf access to Drive/);
+    } finally {
+      driveInsufficient = false;
+    }
+  });
+
+  it('keeps a successful sign-in when adding the storage fails, so retrying works', async () => {
+    const { app } = await makeApp({ google: ep });
+    try {
+      const { flowId, authUrl } = app.startGoogleSignIn('client-id-123');
+      const u = new URL(authUrl);
+      codes.set('code-3', u.searchParams.get('code_challenge')!);
+      await app.completeGoogleSignIn(u.searchParams.get('state')!, 'code-3', null);
+      const input = { kind: 'gdrive', name: 'Drive', config: { flowId, folderName: 'Retry' } };
+      driveInsufficient = true;
+      await expect(app.createRemote(input)).rejects.toMatchObject({ code: 'drive_not_allowed' });
+      driveInsufficient = false;
+      const { remote } = await app.createRemote(input);
+      expect(remote.kind).toBe('gdrive');
+      await expect(app.createRemote({ ...input, name: 'Again' })).rejects.toThrow(/finish signing in/);
+    } finally {
+      driveInsufficient = false;
+      await app.close();
+    }
   });
 });

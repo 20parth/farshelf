@@ -1,7 +1,7 @@
 import { Cloud, FolderOpen, Globe, Lock } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import type { RemoteInfo, RemoteKind } from '../../shared/schemas.ts';
-import { api } from '../lib/api.ts';
+import { api, ApiError } from '../lib/api.ts';
 import { useStore } from '../lib/store.tsx';
 import { Button, copyText, Field } from './ui.tsx';
 
@@ -93,6 +93,8 @@ export function AddRemote({
 
   async function signInGoogle() {
     setSetupError(null);
+    setError(null);
+    setAutoSubmitted(false);
     if (!builtinGoogle && !clientId.trim().endsWith('.apps.googleusercontent.com')) {
       setSetupError('Paste your OAuth client ID first. It ends with .apps.googleusercontent.com.');
       return;
@@ -130,6 +132,8 @@ export function AddRemote({
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      // Google sign-in without Drive access: offer "Sign in with Google" again.
+      if (err instanceof ApiError && err.code === 'drive_not_allowed') setFlow(null);
     } finally {
       setBusy(false);
     }

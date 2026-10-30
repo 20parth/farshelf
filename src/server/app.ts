@@ -417,6 +417,7 @@ export class App extends EventEmitter {
     }
     const id = randomBytes(6).toString('base64url').replace(/[-_]/g, 'x');
     const secrets: Record<string, string> = {};
+    let consumeFlow: string | null = null;
     let config: Record<string, unknown>;
     if (input.kind === 'local') {
       const root = path.resolve(input.config.root.replace(/^~(?=$|\/)/, process.env.HOME ?? '~'));
@@ -433,7 +434,8 @@ export class App extends EventEmitter {
       config = { clientId: flow.clientId, folderName: input.config.folderName, email: flow.result.email };
       secrets.refresh = flow.result.refreshToken;
       if (flow.clientSecret) secrets.clientSecret = flow.clientSecret;
-      this.oauthFlows.delete(flow.id);
+      // The flow is only consumed once the remote is saved, so a failed attempt can be retried.
+      consumeFlow = flow.id;
     }
     for (const [k, v] of Object.entries(secrets)) await this.secrets.set(`remote:${id}:${k}`, v);
 
@@ -451,6 +453,7 @@ export class App extends EventEmitter {
         pending: () => new Map(),
       });
       await backend.list('/').catch((err) => {
+        if (err instanceof AppError && err.code.startsWith('drive_')) throw err; // already user-ready
         throw new AppError(400, 'remote_unreachable', `cannot open the location: ${errorMessage(err)}`);
       });
       const existing = await probe.readVaultDoc();
@@ -480,6 +483,7 @@ export class App extends EventEmitter {
         'insert into remotes (id, name, kind, config, encrypted, created_at) values (?, ?, ?, ?, ?, ?)',
       )
       .run(id, input.name, input.kind, JSON.stringify(config), masterKey ? 1 : 0, Date.now());
+    if (consumeFlow) this.oauthFlows.delete(consumeFlow);
     const vault = await this.mountRemote(this.row(id));
     if (masterKey) {
       vault.setMasterKey(masterKey);

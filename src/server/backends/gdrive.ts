@@ -20,7 +20,8 @@ export const GOOGLE: GoogleEndpoints = {
   uploadBase: 'https://www.googleapis.com/upload/drive/v3',
 };
 
-export const GDRIVE_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/drive.file'];
+const DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+export const GDRIVE_SCOPES = ['openid', 'email', DRIVE_FILE_SCOPE];
 
 export interface GdriveCredentials {
   clientId: string;
@@ -135,6 +136,20 @@ export class GdriveBackend implements Backend {
   private async json<T>(res: Response, what: string): Promise<T> {
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
+      if (res.status === 403 && /insufficient.*scope|insufficientPermissions/i.test(detail)) {
+        throw new AppError(
+          403,
+          'drive_not_allowed',
+          'Google did not give Farshelf access to Drive. Sign in with Google again and tick the Google Drive box on the permission screen.',
+        );
+      }
+      if (res.status === 403 && /accessNotConfigured|has not been used|is disabled/i.test(detail)) {
+        throw new AppError(
+          403,
+          'drive_api_disabled',
+          'The Google Drive API is not enabled for your Google Cloud project. Enable it under APIs & Services › Library › Google Drive API, wait a minute, and try again.',
+        );
+      }
       throw new AppError(
         502,
         'remote_error',
@@ -438,9 +453,18 @@ export async function finishOAuth(
   const json = (await res.json().catch(() => ({}))) as {
     refresh_token?: string;
     id_token?: string;
+    scope?: string;
     error?: string;
     error_description?: string;
   };
+  // Google's consent screen lets people sign in while leaving the Drive box unticked.
+  if (res.ok && json.scope && !json.scope.split(' ').includes(DRIVE_FILE_SCOPE)) {
+    throw new AppError(
+      403,
+      'drive_not_allowed',
+      'You signed in, but Google Drive access was not allowed. Click “Sign in with Google” again and tick the box “See, edit, create and delete only the specific Google Drive files you use with this app”.',
+    );
+  }
   if (!res.ok || !json.refresh_token) {
     throw new AppError(
       502,
