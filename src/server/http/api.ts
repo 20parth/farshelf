@@ -125,6 +125,11 @@ on('GET', '/api/activity', async ({ app, url }) => ({ items: app.activity.list(q
 
 // ---- settings & maintenance ----
 on('PATCH', '/api/settings', async ({ app, req }) => app.updateSettings(await readJson(req, z.unknown())));
+on('POST', '/api/shutdown', async ({ app }) => {
+  app.activity.add('info', 'quit', 'Farshelf was stopped from the app');
+  app.emit('shutdown');
+  return { ok: true };
+});
 on('POST', '/api/cache/clear', async ({ app }) => {
   app.cache.clear();
   app.activity.add('info', 'cache', 'Cleared the streaming cache');

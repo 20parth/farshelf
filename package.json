@@ -31,7 +31,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "package:mac": "bash scripts/build-macos-app.sh"
   },
   "keywords": [
     "webdav",

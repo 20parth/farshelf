@@ -87,6 +87,7 @@ export const api = {
   updateSettings: (patch: Record<string, unknown>) => request<Settings>('PATCH', '/api/settings', patch),
   clearCache: () => request('POST', '/api/cache/clear'),
   mount: () => request('POST', '/api/mount'),
+  shutdown: () => request('POST', '/api/shutdown'),
   googleStart: (clientId: string, clientSecret: string) =>
     request<{ flowId: string; authUrl: string }>('POST', '/api/oauth/google/start', {
       clientId: clientId || undefined,

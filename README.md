@@ -80,6 +80,23 @@ Onboarding asks where your files should live. The default, a folder on this comp
 works immediately. Add a passphrase if you want encryption, and save the recovery key
 it shows you.
 
+### macOS app (double-click, no Node needed)
+
+```bash
+npm run package:mac      # builds dist/macos/Farshelf.app with its own icon and a bundled Node.js
+```
+
+Drag `Farshelf.app` to Applications and open it. Farshelf starts in the background and
+opens its window in your browser. Opening the app again while it runs just reopens the
+window. Quit it from **Settings › Farshelf app › Quit Farshelf**. Logs go to
+`~/Library/Logs/Farshelf.log`.
+
+The app is ad-hoc signed, so it runs on the Mac that built it. Giving it to other people
+needs an Apple Developer ID signature and notarization (see
+[docs/RELEASING.md](docs/RELEASING.md)). Otherwise macOS warns that the developer cannot
+be verified. It is a background app with no Dock icon or menu bar yet; a native shell is
+on the [roadmap](docs/ROADMAP.md).
+
 ### Mount it in your file manager
 
 Settings › _Use it in your file manager_ shows the WebDAV address

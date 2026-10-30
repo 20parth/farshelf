@@ -157,6 +157,26 @@ export function Settings() {
             </li>
           </ul>
         </Section>
+        <Section
+          id="app"
+          title="Farshelf app"
+          description="Farshelf runs in the background so uploads and your mounted drive keep working."
+        >
+          <div>
+            <Button
+              variant="danger"
+              onClick={() =>
+                api.shutdown().then(() => {
+                  document.body.innerHTML =
+                    '<main style="font:16px system-ui;max-width:28rem;margin:6rem auto;text-align:center">Farshelf has stopped. Open the Farshelf app again to start it. You can close this tab.</main>';
+                }, fail)
+              }
+            >
+              Quit Farshelf
+            </Button>
+            <p className="mt-2 text-xs text-muted">Queued uploads continue the next time Farshelf starts.</p>
+          </div>
+        </Section>
         <p className="pb-6 text-center text-xs text-muted">
           Farshelf {state.version} · Apache-2.0 · free and open source
         </p>

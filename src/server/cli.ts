@@ -18,7 +18,7 @@ const HELP = `Farshelf — your storage, streamed like a local disk.
 Usage:
   farshelf start [--port 7420] [--host 127.0.0.1] [--no-open]   Start the daemon and open the UI
                  [--secrets auto|database|memory]               where to keep sign-ins and keys (default: OS keychain)
-  farshelf url                                                  Print the login link for the running daemon
+  farshelf url [--open]                                         Print (or open) the login link for the running daemon
   farshelf decrypt <encrypted-folder> <output-folder>           Decrypt a local copy of an encrypted remote
                    [--recovery-key]                             (prompts for passphrase or recovery key)
   farshelf reset --yes                                          Delete all Farshelf data on this machine
@@ -97,6 +97,8 @@ async function main(): Promise<void> {
     };
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
+    // "Quit Farshelf" in the UI (used by the desktop app, which has no terminal to press Ctrl-C in).
+    app.once('shutdown', () => setTimeout(() => void shutdown(), 100));
     return;
   }
 
@@ -104,7 +106,9 @@ async function main(): Promise<void> {
     try {
       const auth = JSON.parse(await fs.readFile(path.join(dataDir, 'auth.json'), 'utf8'));
       const port = Number(process.env.FARSHELF_PORT ?? 7420);
-      console.log(`http://127.0.0.1:${port}/login#t=${auth.apiToken}`);
+      const link = `http://127.0.0.1:${port}/login#t=${auth.apiToken}`;
+      if (rest.includes('--open')) openBrowser(link);
+      else console.log(link);
     } catch {
       console.error('No Farshelf data found. Run `farshelf start` first.');
       process.exitCode = 1;

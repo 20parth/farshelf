@@ -159,6 +159,15 @@ describe('API file operations', () => {
     expect(text).toContain('"path":"/"');
   });
 
+  it('asks the process to stop when the user quits from the app', async () => {
+    let asked = false;
+    app.once('shutdown', () => (asked = true));
+    const res = await api('/api/shutdown', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(asked).toBe(true);
+    expect((await fetch(`${base}/api/shutdown`, { method: 'POST' })).status).toBe(401);
+  });
+
   it('reports AI as disabled by default', async () => {
     const res = await api('/api/ai/search', {
       method: 'POST',
