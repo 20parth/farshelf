@@ -148,6 +148,7 @@ export class App extends EventEmitter {
         });
       }
     }
+    await app.loadSavedGoogleClient();
     const recovered = app.jobs.recover();
     if (recovered)
       app.activity.add('info', 'recovery', `Resumed ${recovered} interrupted job(s) after restart`);
@@ -328,13 +329,36 @@ export class App extends EventEmitter {
     return vault;
   }
 
-  startGoogleSignIn(clientId: string, clientSecret?: string): { flowId: string; authUrl: string } {
+  /** A Google OAuth client the user entered once on this machine; reused so later sign-ins are one click. */
+  savedGoogleClient: { clientId: string; clientSecret?: string } | null = null;
+
+  async loadSavedGoogleClient(): Promise<void> {
+    const raw = await this.secrets.get('google:client').catch(() => null);
+    try {
+      this.savedGoogleClient = raw ? JSON.parse(raw) : null;
+    } catch {
+      this.savedGoogleClient = null;
+    }
+  }
+
+  async forgetGoogleClient(): Promise<void> {
+    await this.secrets.delete('google:client');
+    this.savedGoogleClient = null;
+    this.emit('state');
+  }
+
+  startGoogleSignIn(
+    clientId: string,
+    clientSecret?: string,
+    opts: { remember?: boolean } = {},
+  ): { flowId: string; authUrl: string } {
     const { flow, authUrl } = startOAuth(
       clientId,
       clientSecret,
       `${this.baseUrl}/oauth/callback`,
       this.google,
     );
+    flow.remember = !!opts.remember;
     this.oauthFlows.set(flow.id, flow);
     for (const [id, f] of this.oauthFlows)
       if (Date.now() - f.createdAt > 15 * 60_000) this.oauthFlows.delete(id);
@@ -355,6 +379,13 @@ export class App extends EventEmitter {
     } else {
       try {
         flow.result = await finishOAuth(flow, code, this.google);
+        // The client worked: remember it so the next sign-in on this machine needs no setup.
+        if (flow.remember) {
+          this.savedGoogleClient = { clientId: flow.clientId, clientSecret: flow.clientSecret };
+          await this.secrets.set('google:client', JSON.stringify(this.savedGoogleClient));
+          this.activity.add('info', 'google', 'Saved your Google sign-in setup on this computer');
+          this.emit('state');
+        }
       } catch (err) {
         flow.error = errorMessage(err);
       }

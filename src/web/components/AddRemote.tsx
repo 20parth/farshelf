@@ -42,6 +42,7 @@ export function AddRemote({
   const kinds = builtinGoogle ? [KINDS[2]!, KINDS[0]!, KINDS[1]!] : KINDS;
   const [kind, setKind] = useState<RemoteKind>(builtinGoogle ? 'gdrive' : 'local');
   const [autoSubmitted, setAutoSubmitted] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const [name, setName] = useState('My Files');
   const [nameTouched, setNameTouched] = useState(false);
   const [root, setRoot] = useState('~/Farshelf Storage');
@@ -91,6 +92,11 @@ export function AddRemote({
         : null;
 
   async function signInGoogle() {
+    setSetupError(null);
+    if (!builtinGoogle && !clientId.trim().endsWith('.apps.googleusercontent.com')) {
+      setSetupError('Paste your OAuth client ID first. It ends with .apps.googleusercontent.com.');
+      return;
+    }
     try {
       const { flowId, authUrl } = await api.googleStart(clientId, clientSecret);
       setFlow({ id: flowId, done: false, ok: false, email: null, error: null });
@@ -244,6 +250,7 @@ export function AddRemote({
               {flow && !flow.done && 'Finish signing in in the browser tab that opened…'}
               {flow?.ok && `Connected as ${flow.email ?? 'your account'}${busy ? '. Adding…' : ''}`}
               {flow?.error && <span className="text-danger">{flow.error}</span>}
+              {setupError && <span className="text-danger">{setupError}</span>}
             </span>
           </div>
           <details open={!builtinGoogle} className="text-sm">
@@ -252,10 +259,28 @@ export function AddRemote({
             </summary>
             <div className="mt-3 flex flex-col gap-3">
               {!builtinGoogle && (
-                <p className="text-xs text-muted">
-                  This copy of Farshelf has no built-in Google sign-in, so enter your own OAuth client
-                  (“Desktop app” type). See <code>docs/AI_AND_PROVIDERS.md</code>.
-                </p>
+                <div className="flex flex-col gap-2 rounded-lg bg-panel p-3 text-xs">
+                  <p className="font-medium text-ink">One-time setup on this computer</p>
+                  <p className="text-muted">
+                    Google requires every app to have its own “OAuth client”. Create a free one (about 5
+                    minutes), paste it below and sign in. Farshelf remembers it, so next time it is just “Sign
+                    in with Google”.
+                  </p>
+                  <ol className="list-decimal space-y-0.5 pl-4 text-muted">
+                    <li>
+                      Open <strong>console.cloud.google.com</strong>, create a project and enable the{' '}
+                      <strong>Google Drive API</strong>.
+                    </li>
+                    <li>
+                      Set up the <strong>OAuth consent screen</strong> (External) and add your Gmail as a{' '}
+                      <strong>test user</strong>.
+                    </li>
+                    <li>
+                      <strong>Credentials › Create credentials › OAuth client ID › Desktop app</strong>.
+                    </li>
+                    <li>Copy the Client ID and Client secret into the two fields below.</li>
+                  </ol>
+                </div>
               )}
               <Field
                 label="Folder in your Drive"
@@ -263,7 +288,7 @@ export function AddRemote({
                 onChange={(e) => setFolderName(e.target.value)}
               />
               <Field
-                label="OAuth client ID (optional)"
+                label={builtinGoogle ? 'OAuth client ID (optional)' : 'OAuth client ID'}
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
                 placeholder={
@@ -273,7 +298,7 @@ export function AddRemote({
                 }
               />
               <Field
-                label="OAuth client secret (optional)"
+                label={builtinGoogle ? 'OAuth client secret (optional)' : 'OAuth client secret'}
                 type="password"
                 value={clientSecret}
                 onChange={(e) => setClientSecret(e.target.value)}

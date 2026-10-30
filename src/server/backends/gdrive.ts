@@ -386,6 +386,8 @@ export interface OAuthFlow {
   createdAt: number;
   result?: { refreshToken: string; email: string | null };
   error?: string;
+  /** Save this client for future sign-ins once it succeeds (set when the user typed it in). */
+  remember?: boolean;
 }
 
 export function startOAuth(

@@ -38,7 +38,7 @@ export function appState(app: App, aiKeyStored: boolean): AppState {
     cache: app.cache.stats(),
     platform: process.platform,
     keychain: app.secrets.kind,
-    googleSignIn: builtinGoogleClient() ? 'builtin' : 'own-client',
+    googleSignIn: builtinGoogleClient() || app.savedGoogleClient ? 'builtin' : 'own-client',
   };
 }
 
@@ -168,15 +168,22 @@ on('POST', '/api/oauth/google/start', async ({ app, req }) => {
     z.object({ clientId: z.string().min(10).optional(), clientSecret: z.string().optional() }),
   );
   // A client the user typed in (Advanced) wins; otherwise use the publisher's built-in client.
-  if (body.clientId) return app.startGoogleSignIn(body.clientId, body.clientSecret || undefined);
-  const builtin = builtinGoogleClient();
+  if (body.clientId)
+    return app.startGoogleSignIn(body.clientId.trim(), body.clientSecret?.trim() || undefined, {
+      remember: true,
+    });
+  const builtin = builtinGoogleClient() ?? app.savedGoogleClient;
   if (!builtin)
     throw new AppError(
       400,
       'no_client_id',
-      'This copy of Farshelf has no built-in Google sign-in. Open "Advanced" and enter your own OAuth client (see docs/AI_AND_PROVIDERS.md).',
+      'Google sign-in is not set up on this computer yet. Paste your OAuth client ID and secret under “Google sign-in setup” below (one time only), then click Sign in with Google again.',
     );
   return app.startGoogleSignIn(builtin.clientId, builtin.clientSecret);
+});
+on('DELETE', '/api/oauth/google/client', async ({ app }) => {
+  await app.forgetGoogleClient();
+  return { ok: true };
 });
 on('GET', '/api/oauth/google/:flow', async ({ app, params }) => app.googleFlowStatus(params[0]!));
 
